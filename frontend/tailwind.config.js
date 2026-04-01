@@ -4,7 +4,14 @@ module.exports = {
     "./src/**/*.{js,jsx}"
   ],
   theme: {
-    extend: {},
+      extend: {
+      fontFamily: {
+        serif: ['Playfair Display', 'serif'],
+      },
+      colors: {
+        brandRed: '#D34F4E',
+      },
+    },
   },
   plugins: [],
 };
