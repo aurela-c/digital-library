@@ -2,23 +2,15 @@ import { useState } from "react";
 
 const books = [
   {
-    title: "Book One",
-    author: "Author One",
     image: "/images/book1.jpg"
   },
   {
-    title: "Book Two",
-    author: "Author Two",
     image: "/images/book2.jpg"
   },
   {
-    title: "Book Three",
-    author: "Author Three",
     image: "/images/book3.jpg"
   },
   {
-    title: "Book Four",
-    author: "Author Four",
     image: "/images/book4.jpg"
   }
 ];
