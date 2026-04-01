@@ -13,11 +13,14 @@ function App() {
 
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/home" element={<Home />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/book/:id" element={<BookDetails />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="*" element={ <div className="min-h-screen flex items-center justify-center">
+      <h1 className="text-3xl font-bold">404 - Page Not Found</h1>
+    </div>} />
 
       </Routes>
     </BrowserRouter>
