@@ -11,7 +11,7 @@ const HomeNavbar = () => {
         </div>
        
         <div className="hidden md:flex space-x-6">
-          <Link to="/" className="text-gray-700 hover:text-[#D34F4E] font-semibold">Home</Link>
+          <Link to="/home" className="text-gray-700 hover:text-[#D34F4E] font-semibold">Home</Link>
           <Link to="/categories" className="text-gray-700 hover:text-[#D34F4E] font-semibold">Categories</Link>
           <Link to="/trending" className="text-gray-700 hover:text-[#D34F4E] font-semibold">Trending</Link>
           <Link to="/contact" className="text-gray-700 hover:text-[#D34F4E] font-semibold">Contact Us</Link>
