@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 const LandingPage = () => {
   return (
-    <div className="bg-[#f5efe9] min-h-screen">
+    <div className="bg-[#F9F3EB] min-h-screen">
       <Navbar />
 
       <div className="text-center mt-5 px-6">

@@ -1,45 +1,41 @@
 import React from "react";
 
 const books = [
-  {
-    id: 1,
-    title: "1984",
-    author: "George Orwell",
-    image: "/images/book1.jpg",
-  },
-  {
-    id: 2,
-    title: "Agua Viva",
-    author: "Clarice Lispector",
-    image: "/images/book8.jpg",
-  },
-  {
-    id: 3,
-    title: "Gianni's Room",
-    author: "James Baldwin",
-    image: "/images/book9.jpg",
-  },
-  {
-    id: 4,
-    title: "Norwegian Wood",
-    author: "Haruki Murakami",
-    image: "/images/book11.jpg",
-  },
-  {
-    id: 5,
-    title: "Colson Whitehead",
-    author: "The Nickel Boys",
-    image: "/images/book5.jpg",
-  },
-  {
-    id: 6,
-    title: "Begin Again",
-    author: "Jenny Lynne Morrison",
-    image: "/images/book6.jpg",
-  },
+  { id: 1, title: "1984", author: "George Orwell", image: "/images/book1.jpg" },
+  { id: 2, title: "Agua Viva", author: "Clarice Lispector", image: "/images/book8.jpg" },
+  { id: 3, title: "Gianni's Room", author: "James Baldwin", image: "/images/book9.jpg" },
+  { id: 4, title: "Norwegian Wood", author: "Haruki Murakami", image: "/images/book11.jpg" },
+  { id: 5, title: "Colson Whitehead", author: "The Nickel Boys", image: "/images/book5.jpg" },
+  { id: 6, title: "Begin Again", author: "Jenny Lynne Morrison", image: "/images/book6.jpg" },
 ];
 
 function PopularNow() {
+  const handleBorrow = async (book) => {
+    const userId = localStorage.getItem("userId"); // set this on login
+    if (!userId) {
+      alert("Please log in to borrow books.");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:5000/api/borrow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, bookId: book.id }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(`You borrowed "${book.title}"!`);
+      } else {
+        alert(data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to borrow book. Try again later.");
+    }
+  };
+
   return (
     <div className="mt-10">
       <div className="flex justify-between items-center mb-6">

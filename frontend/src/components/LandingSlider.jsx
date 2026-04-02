@@ -46,8 +46,8 @@ const LandingSlider = () => {
   </button>
   <div className="relative w-90 h-100"> 
     <img
-      src="/images/foto1.png"
-      alt="Book 1"
+      src="/images/foto3.png"
+      alt="Book 2"
       className="w-full h-full object-cover rounded"
     />
   </div>

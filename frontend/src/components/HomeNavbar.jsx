@@ -17,7 +17,7 @@ const HomeNavbar = () => {
           <Link to="/contact" className="text-gray-700 hover:text-[#D34F4E] font-semibold">Contact Us</Link>
         </div>
 
-           <div className="flex items-center bg-gray-100 px-4 py-2 rounded-full w-96">
+           <div className="flex items-center bg-white px-4 py-2 rounded-full w-96">
 
         <input
           type="text"

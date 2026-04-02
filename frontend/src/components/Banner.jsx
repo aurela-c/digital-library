@@ -3,7 +3,7 @@ const Banner = () => {
     <div
       className="rounded-2xl p-10 flex flex-col md:flex-row items-center justify-between mb-10 shadow-md
                  bg-cover bg-center h-60"
-      style={{ backgroundImage: "url('/images/banner5.png')" }}
+      style={{ backgroundImage: "url('/images/banner8.png')" }}
     >
       <div className="text-center md:text-left text-gray-700">
         <h2 className="text-3xl font-bold mb-3">
