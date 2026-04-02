@@ -58,7 +58,12 @@ function PopularNow() {
             />
             <h3 className="mt-3 font-semibold text-sm">{book.title}</h3>
             <p className="text-gray-500 text-xs">{book.author}</p>
-            <div className="inline-flex  bg-[#D34F4E] mt-2 text-white text-sm font-medium px-8 rounded-sm  hover:bg-black">Borrow</div>
+            <div
+              onClick={() => handleBorrow(book)}
+              className="inline-flex bg-[#D34F4E] mt-2 text-white text-sm font-medium px-8 rounded-sm hover:bg-black transition-colors duration-300 cursor-pointer"
+            >
+              Borrow
+            </div>
           </div>
         ))}
       </div>

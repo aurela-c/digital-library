@@ -28,10 +28,11 @@ const HomeNavbar = () => {
         <span className="text-gray-500"></span>
 
       </div>
-
+       <Link to="/profile">
         <div>
           <FaUserCircle className="text-gray-700 text-3xl cursor-pointer hover:text-[#D34F4E]" />
         </div>
+        </Link>
       </div>
     </nav>
   );

@@ -18,8 +18,7 @@ const Home = () => {
     <div className="bg-[#f5efe9] min-h-screen px-4 md:px-10">
       <HomeNavbar />
         <Banner />
-
-      <div className="mt-12">
+        <div className="mt-12">
         <PopularNow />
       </div>
     </div>
