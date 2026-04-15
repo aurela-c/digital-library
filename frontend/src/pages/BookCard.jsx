@@ -1,16 +1,48 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { books } from "../data/books";
 import { useParams } from "react-router-dom";
 
 export default function BookCard() {
   const { id } = useParams();
+
   const [selectedBook, setSelectedBook] = useState(() => {
-  return books.find((b) => b.id === Number(id)) || books[0];
-});
+    return books.find((b) => b.id === Number(id)) || books[0];
+  });
 
+  const handleBorrow = async () => {
+    try {
+      const userId = localStorage.getItem("userId");
 
+      if (!userId) {
+        alert("You must be logged in to borrow a book.");
+        return;
+      }
 
-  
+      const res = await fetch("http://localhost:5000/api/borrow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: Number(userId),
+          bookId: selectedBook.id,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Borrow failed");
+        return;
+      }
+
+      alert("Book borrowed successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Server error");
+    }
+  };
+
   if (!selectedBook) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5efe9]">
@@ -21,7 +53,6 @@ export default function BookCard() {
 
   return (
     <div className="bg-[#f5efe9] min-h-screen flex">
-
       
       <div className="flex flex-1 justify-center items-start p-16 gap-16">
 
@@ -47,28 +78,29 @@ export default function BookCard() {
           </p>
 
           <div className="flex gap-6 mb-10 text-sm text-gray-700 font-medium">
-  <div>
-    <span className="font-bold text-[#D34F4E]">Year:</span> {selectedBook.year}
-  </div>
+            <div>
+              <span className="font-bold text-[#D34F4E]">Year:</span> {selectedBook.year}
+            </div>
 
-  <div>
-    <span className="font-bold text-[#D34F4E]">Language:</span> {selectedBook.language}
-  </div>
+            <div>
+              <span className="font-bold text-[#D34F4E]">Language:</span> {selectedBook.language}
+            </div>
 
-  <div>
-    <span className="font-bold text-[#D34F4E]">Pages:</span> {selectedBook.pages}
-  </div>
-</div>
+            <div>
+              <span className="font-bold text-[#D34F4E]">Pages:</span> {selectedBook.pages}
+            </div>
+          </div>
 
-          <button className="bg-[#D34F4E] text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition">
+          <button
+            onClick={handleBorrow}
+            className="bg-[#D34F4E] text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition"
+          >
             Borrow Book
           </button>
         </div>
       </div>
 
-     
       <div className="w-[300px] h-screen overflow-y-auto bg-white shadow-md">
-
         {books.map((book) => (
           <div
             key={book.id}
@@ -80,13 +112,13 @@ export default function BookCard() {
                 transition
                 border-l-4
                 ${
-                    selectedBook?.id === book.id
+                  selectedBook?.id === book.id
                     ? "border-[#D34F4E] bg-gray-100"
                     : "border-transparent"
                 }
                 hover:bg-gray-100
-                `}
-                >
+              `}
+          >
             <img
               src={book.image}
               alt={book.title}
@@ -94,7 +126,6 @@ export default function BookCard() {
             />
           </div>
         ))}
-
       </div>
 
     </div>

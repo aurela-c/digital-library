@@ -44,7 +44,7 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Book already borrowed." });
     }
 
-    // Create borrow record
+
     const borrowed = await BorrowedBook.create({
       user_id: userId,
       book_id: bookId,
@@ -86,9 +86,11 @@ router.get("/:userId", async (req, res) => {
 
     res.json(borrowed);
 
-  } catch (err) {
-    console.error("Borrow GET error:", err);
-    res.status(500).json({ error: "Server error" });
+    } catch (err) {
+    console.error("FULL ERROR:", err); 
+    return res.status(500).json({
+      error: err.message,
+    });
   }
 });
 

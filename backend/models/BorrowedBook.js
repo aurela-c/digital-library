@@ -16,10 +16,16 @@ const BorrowedBook = sequelize.define(
   {
     tableName: "borrows",
     timestamps: true,
+
+    indexes: [
+      {
+        unique: true,
+        fields: ["user_id", "book_id", "status"],
+      },
+    ],
   }
 );
 
-// Relations
 User.hasMany(BorrowedBook, { foreignKey: "user_id" });
 BorrowedBook.belongsTo(User, { foreignKey: "user_id" });
 

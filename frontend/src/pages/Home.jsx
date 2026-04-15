@@ -5,6 +5,7 @@ import Banner from "../components/Banner";
 import PopularNow from "../components/PopularNow";
 import Categories from "../components/Categories";
 import Footer from "../components/Footer";
+import Events from "../components/Events";
 
 
 const Home = () => {
@@ -25,7 +26,9 @@ const Home = () => {
         <PopularNow />
       </div>
       <Categories />
+      <Events />
       <Footer />
+
     </div>
   );
 };
