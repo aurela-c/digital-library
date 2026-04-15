@@ -12,22 +12,20 @@ const Register = () => {
     e.preventDefault();
 
     try {
-      await axios.post(
-        "http://localhost:5000/api/auth/register",
-        {
-          name,
-          email,
-          password,
-        }
-      );
+      await axios.post("http://localhost:5000/api/auth/register", {
+        name,
+        email,
+        password,
+      });
 
       alert("Registered successfully!");
-      navigate("/home");
-
     } catch (err) {
-      alert(err.response?.data?.error || "Registration failed");
       console.error(err);
+      alert(err.response?.data?.error || "Registration failed (demo mode continues)");
     }
+
+
+    navigate("/home");
   };
 
   return (
@@ -35,7 +33,6 @@ const Register = () => {
 
       <div className="w-full max-w-3xl min-h-[500px] bg-white shadow-md flex overflow-hidden">
 
-        {/* LEFT IMAGE */}
         <div className="hidden md:flex relative w-1/2 overflow-hidden">
           <img
             src="/images/LoginPhoto.jpg"
@@ -52,7 +49,6 @@ const Register = () => {
           </div>
         </div>
 
-        
         <div className="w-full md:w-1/2 relative flex flex-col justify-center px-10 py-12">
 
           <Link
@@ -63,7 +59,7 @@ const Register = () => {
           </Link>
 
           <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
-            Create your account
+            Create your account 
           </h2>
 
           <form className="space-y-5" onSubmit={handleRegister}>
@@ -80,7 +76,6 @@ const Register = () => {
               />
             </div>
 
-         
             <div>
               <label className="block text-sm text-gray-600 mb-1">Email</label>
               <input
@@ -93,7 +88,6 @@ const Register = () => {
               />
             </div>
 
-           
             <div>
               <label className="block text-sm text-gray-600 mb-1">Password</label>
               <input

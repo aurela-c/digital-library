@@ -53,7 +53,6 @@ const Login = () => {
           </div>
         </div>
 
-        {/* RIGHT FORM */}
         <div className="w-full md:w-1/2 relative flex flex-col justify-center px-10 py-12">
 
           <Link
@@ -69,7 +68,6 @@ const Login = () => {
 
           <form className="space-y-5" onSubmit={handleLogin}>
 
-            {/* EMAIL */}
             <div>
               <label className="block text-sm text-gray-600 mb-1">Email</label>
               <input
