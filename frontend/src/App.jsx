@@ -4,7 +4,9 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
-import BookDetails from "./pages/BookDetails";
+import BookCard from "./pages/BookCard";
+
+
 
 function App() {
   return (
@@ -16,10 +18,11 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/home" element={<Home />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/book/:id" element={<BookDetails />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/book/:id" element={<BookCard />} />
         <Route path="*" element={ <div className="min-h-screen flex items-center justify-center">
       <h1 className="text-3xl font-bold">404 - Page Not Found</h1>
+
     </div>} />
 
       </Routes>

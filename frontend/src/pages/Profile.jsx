@@ -4,21 +4,22 @@ const Profile = () => {
   const [borrowedBooks, setBorrowedBooks] = useState([]);
 
   useEffect(() => {
-    const fetchBorrowed = async () => {
-      const userId = localStorage.getItem("userId");
-      if (!userId) return;
+  const fetchBorrowed = async () => {
+    const userId = localStorage.getItem("userId");
+    if (!userId) return;
 
-      try {
-        const res = await fetch(`http://localhost:5000/api/borrow/${userId}`);
-        const data = await res.json();
-        setBorrowedBooks(data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
+    try {
+      const res = await fetch(`http://localhost:5000/api/borrow/${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      setBorrowedBooks(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-    fetchBorrowed();
-  }, []);
+  fetchBorrowed();
+}, []);
 
   return (
     <div className="min-h-screen bg-[#f5efe9] p-6">
@@ -30,15 +31,14 @@ const Profile = () => {
         <p className="text-gray-500">You haven’t borrowed any books yet.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-          {borrowedBooks.map((book) => (
-            <div key={book.id} className="bg-white rounded-xl shadow-md p-3">
-              <img
-                src={book.image}
-                alt={book.title}
-                className="w-full h-40 object-cover rounded-md"
-              />
-              <h3 className="mt-2 font-semibold text-sm">{book.title}</h3>
-              <p className="text-gray-500 text-xs">{book.author}</p>
+         {borrowedBooks.map((item) => (
+          <div key={item.id} className="bg-white rounded-xl shadow-md p-3">
+            <img
+            src={item.Book.image} 
+            alt={item.Book.title}
+            className="w-full h-40 object-cover rounded-md"/>
+            <h3 className="mt-2 font-semibold text-sm">{item.Book.title}</h3>
+            <p className="text-gray-500 text-xs">{item.Book.author}</p>
             </div>
           ))}
         </div>
