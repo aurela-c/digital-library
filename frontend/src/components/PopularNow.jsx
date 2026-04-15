@@ -32,7 +32,7 @@ function PopularNow() {
   };
 
   return (
-    <div className="mt-10">
+    <div className="mt-10 px-4 md:px-10 ">
       <h2 className="text-2xl font-bold text-[#D34F4E] mb-6">
         Popular Now
       </h2>

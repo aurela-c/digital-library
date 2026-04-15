@@ -1,47 +1,51 @@
 import React from "react";
 
-const Categories = () => {
-  const categories = [
-    "Literature",
-    "Technology",
-    "Business",
-    "History",
-    "Science",
-    "Arts",
-  ];
+const categories = [
+  "LITERATURE",
+  "TECHNOLOGY",
+  "BUSINESS",
+  "HISTORY",
+  "SCIENCE",
+  "ARTS",
+];
 
+export default function Categories() {
   return (
-    <div className="mt-16">
-      <h2 className="text-2xl font-bold text-[#D34F4E] mb-6">
-        Explore Categories
-      </h2>
+    <div className="mt-16 relative py-12 w-full overflow-hidden">
 
-      <div className="grid grid-cols-2 gap-6 h-[340px]">
+ 
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{
+          backgroundImage: "url('/images/categories/img2.png')",
+        }}
+      />
 
-        <div className="bg-white shadow-md overflow-hidden h-full ">
-          <img
-            className="w-full h-full object-cover"
-            src="/images/image1.jpg"
-            alt="Poster"
-          />
-        </div>
-        <div className="grid grid-cols-3 gap-6 h-full">
+      <div className="absolute inset-0 bg-black/50" />
+
+      <div className="relative flex flex-col items-center px-6">
+
+    
+        <h2 className="text-3xl font-bold text-white mb-10 text-center">
+          Explore Categories
+        </h2>
+
+      
+        <div className="grid grid-cols-3 gap-5 max-w-2xl w-full">
           {categories.map((cat, index) => (
             <div
               key={index}
               className="
-                bg-white
-                shadow-md
-                flex
-                items-center
-                justify-center
-                text-center
+                bg-white/60
+                text-gray-600
                 font-semibold
-                text-gray-700
+                text-center
+                py-5
+                shadow-md
                 cursor-pointer
-                hover:shadow-xl
-                hover:scale-105
                 transition
+                hover:shadow-[0_0_20px_rgba(255,255,255,0.35)]
+                hover:scale-105
               "
             >
               {cat}
@@ -52,6 +56,4 @@ const Categories = () => {
       </div>
     </div>
   );
-};
-
-export default Categories;
+}

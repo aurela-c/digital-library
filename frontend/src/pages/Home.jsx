@@ -19,7 +19,7 @@ const Home = () => {
   };
 
   return (
-    <div className="bg-[#f5efe9] min-h-screen px-4 md:px-10">
+    <div className="bg-[#f5efe9] min-h-screen  ">
       <HomeNavbar />
         <Banner />
         <div className="mt-12">
