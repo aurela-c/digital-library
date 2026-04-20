@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const books = [
   { image: "/images/book1.jpg" },
@@ -18,40 +18,55 @@ const LandingSlider = () => {
     setCurrent((prev) => (prev - 1 + books.length) % books.length);
   };
 
+ 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      nextBook();
+    }, 3000); 
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
- <div className="mt-7 flex items-center justify-center gap-8">
-  <div className="relative w-90 h-100"> 
-    <img
-      src="/images/foto1.png"
-      alt="Book 1"
-      className="w-full h-full object-cover rounded"
-    />
-  </div>
-  <button
-    onClick={prevBook}
-    className="bg-white shadow rounded-full w-10 h-10 flex items-center justify-center"
-  >
-    ←
-  </button>
-  <img
-    src={books[current].image}
-    alt={`Book ${current + 1}`}
-    className="w-54 h-86 object-cover rounded-xl shadow-lg"
-  />
-  <button
-    onClick={nextBook}
-    className="bg-white shadow rounded-full w-10 h-10 flex items-center justify-center"
-  >
-    →
-  </button>
-  <div className="relative w-90 h-100"> 
-    <img
-      src="/images/foto3.png"
-      alt="Book 2"
-      className="w-full h-full object-cover rounded"
-    />
-  </div>
-</div>
+    <div className="mt-7 flex items-center justify-center gap-8">
+
+      <div className="relative w-90 h-100">
+        <img
+          src="/images/foto1.png"
+          alt="Book 1"
+          className="w-full h-full object-cover rounded"
+        />
+      </div>
+
+      <button
+        onClick={prevBook}
+        className="bg-white shadow rounded-full w-10 h-10 flex items-center justify-center"
+      >
+        ←
+      </button>
+
+      <img
+        src={books[current].image}
+        alt={`Book ${current + 1}`}
+        className="w-54 h-86 object-cover rounded-xl shadow-lg transition duration-500"
+      />
+
+      <button
+        onClick={nextBook}
+        className="bg-white shadow rounded-full w-10 h-10 flex items-center justify-center"
+      >
+        →
+      </button>
+
+      <div className="relative w-90 h-100">
+        <img
+          src="/images/foto3.png"
+          alt="Book 2"
+          className="w-full h-full object-cover rounded"
+        />
+      </div>
+
+    </div>
   );
 };
 

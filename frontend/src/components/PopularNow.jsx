@@ -1,8 +1,9 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import { books } from "../data/books";
 
 function PopularNow() {
+  const featuredBooks = books.filter((book) => book.featured);
+
   const handleBorrow = async (book) => {
     const userId = localStorage.getItem("userId");
 
@@ -32,22 +33,22 @@ function PopularNow() {
   };
 
   return (
-    <div className="mt-10 px-4 md:px-10 ">
+    <div id="popular-now" className="mt-10 px-4 md:px-10">
       <h2 className="text-2xl font-bold text-[#D34F4E] mb-6">
         Popular Now
       </h2>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6">
-        {books.map((book) => (
+        {featuredBooks.map((book) => (
           <div
             key={book.id}
-            className="bg-white  shadow-md p-3 hover:shadow-lg transition"
+            className="bg-white shadow-md p-3 hover:shadow-lg transition"
           >
             <Link to={`/book/${book.id}`}>
               <img
                 src={book.image}
                 alt={book.title}
-                className="w-full h-52 object-cover  hover:scale-105 transition"
+                className="w-full h-52 object-cover hover:scale-105 transition"
               />
 
               <h3 className="mt-3 font-semibold text-sm">

@@ -73,7 +73,7 @@ export default function Events() {
         onClick={scrollLeft}
         className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white text-[#D34F4E] w-6 h-6 rounded-full shadow"
       >
-        ‹
+         ←
       </button>
 
    
@@ -81,7 +81,7 @@ export default function Events() {
         onClick={scrollRight}
         className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white text-[#D34F4E] w-6 h-6 rounded-full shadow"
       >
-        ›
+         →
       </button>
 
 

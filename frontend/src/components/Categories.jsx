@@ -1,19 +1,19 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 const categories = [
-  "LITERATURE",
-  "TECHNOLOGY",
-  "BUSINESS",
-  "HISTORY",
-  "SCIENCE",
-  "ARTS",
+  "literature",
+  "technology",
+  "business",
+  "history",
+  "science",
+  "arts",
 ];
 
 export default function Categories() {
   return (
     <div className="mt-16 relative py-12 w-full overflow-hidden">
 
- 
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
@@ -25,16 +25,15 @@ export default function Categories() {
 
       <div className="relative flex flex-col items-center px-6">
 
-    
         <h2 className="text-3xl font-bold text-white mb-10 text-center">
           Explore Categories
         </h2>
 
-      
         <div className="grid grid-cols-3 gap-5 max-w-2xl w-full">
           {categories.map((cat, index) => (
-            <div
+            <Link
               key={index}
+              to={`/categories/${cat}`}
               className="
                 bg-white/60
                 text-gray-600
@@ -48,8 +47,8 @@ export default function Categories() {
                 hover:scale-105
               "
             >
-              {cat}
-            </div>
+              {cat.toUpperCase()}
+            </Link>
           ))}
         </div>
 
