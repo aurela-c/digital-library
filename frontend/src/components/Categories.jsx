@@ -17,7 +17,7 @@ export default function Categories() {
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
-          backgroundImage: "url('/images/categories/img2.png')",
+          backgroundImage: "url('/images/categories/pldh.jpg')",
         }}
       />
 

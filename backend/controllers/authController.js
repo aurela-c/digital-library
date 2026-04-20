@@ -28,7 +28,6 @@ export const register = async (req, res) => {
   }
 };
 
-// LOGIN
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -41,7 +40,6 @@ export const login = async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(400).json({ error: "Invalid email or password" });
 
-    // Generate JWT token
     const token = jwt.sign(
       { id: user.id, email: user.email },
       "YOUR_SECRET_KEY",
@@ -52,7 +50,7 @@ export const login = async (req, res) => {
       token,
       user: {
         id: user.id,
-        name: user.name,
+        name: user.username,
         email: user.email,
       },
     });

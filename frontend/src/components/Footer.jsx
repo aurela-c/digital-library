@@ -11,12 +11,12 @@ const Footer = () => {
             The Book Club
           </h3>
 
-          <p className="text-gray-600">
-            xxx rruga rruga <br />
-            Prizren, Kosovo
+          <p className="text-gray-700">
+            Sheshi i Lidhjes <br />
+            Prizren, Kosova
           </p>
 
-          <p className="text-gray-600 mt-2">
+          <p className="text-gray-700 mt-2">
             Phone: +383 xxx xxx
           </p>
         </div>
@@ -24,7 +24,7 @@ const Footer = () => {
           
           <h4 className="font-bold text-[#D34F4E] mb-2">Working Hours</h4>
 
-          <p className="text-sm">
+          <p className="text-md">
             Monday - Friday: <br />
             08:00 - 20:00
           </p>
@@ -38,7 +38,7 @@ const Footer = () => {
           <div className="mt-4">
             <p className="font-semibold mb-2">Follow us</p>
 
-            <div className="flex gap-4 text-[#D34F4E] text-xl">
+            <div className="flex gap-4 text-[#D34F4E] text-2xl">
               <a href="#" className="hover:scale-110 transition">
                 <i className="fab fa-facebook"></i>
               </a>

@@ -16,6 +16,8 @@ const BorrowedBook = sequelize.define(
   {
     tableName: "borrows",
     timestamps: true,
+    createdAt: "created_at",
+    updatedAt: false,
 
     indexes: [
       {
