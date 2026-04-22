@@ -2,11 +2,11 @@ const Banner = () => {
   return (
     <div className="px-4 md:px-10 mb-10">
       <div
-        className="p-10 flex flex-col md:flex-row items-center justify-between shadow-md
-                   bg-cover bg-center h-60 "
-        style={{ backgroundImage: "url('/images/banner8.png')" }}
+        className="p-10 flex items-center justify-center shadow-md
+                   bg-cover bg-center h-60"
+        style={{ backgroundImage: "url('/images/banner0.jfif')" }}
       >
-        <div className="text-center md:text-left text-[#D34F4E]">
+        <div className="text-center text-[#D34F4E]">
           <h2 className="text-3xl font-bold mb-3">
             Build Your Library
           </h2>

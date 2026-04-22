@@ -74,7 +74,6 @@ router.get("/:userId", async (req, res) => {
     const borrowed = await BorrowedBook.findAll({
       where: {
         user_id: userId,
-        status: "borrowed",
       },
       include: [
         {
@@ -82,15 +81,56 @@ router.get("/:userId", async (req, res) => {
           attributes: ["id", "title", "author", "image"],
         },
       ],
+      order: [["created_at", "DESC"]],
     });
 
     res.json(borrowed);
 
-    } catch (err) {
-    console.error("FULL ERROR:", err); 
-    return res.status(500).json({
-      error: err.message,
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+//reutrn
+
+router.put("/return/:id", async (req, res) => {
+  try {
+    const borrowId = req.params.id;
+
+    const borrow = await BorrowedBook.findByPk(borrowId, {
+      include: Book,
     });
+
+    if (!borrow) {
+      return res.status(404).json({ error: "Borrow record not found" });
+    }
+
+    if (borrow.status === "returned") {
+      return res.status(400).json({ error: "Already returned" });
+    }
+
+
+    await borrow.update({
+      return_date: new Date(),
+      status: "returned",
+    });
+
+
+    const book = await Book.findByPk(borrow.book_id);
+
+    await book.update({
+      available_copies: book.available_copies + 1,
+    });
+
+    res.json({
+      message: "Book returned successfully",
+      borrow,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 

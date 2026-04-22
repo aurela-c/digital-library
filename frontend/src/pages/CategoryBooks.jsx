@@ -1,22 +1,40 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
+import { useEffect, useMemo } from "react";
 import { books } from "../data/books";
 import HomeNavbar from "../components/HomeNavbar";
 import Footer from "../components/Footer";
 
 export default function CategoryBooks() {
   const { category } = useParams();
+  const location = useLocation();
 
-  const filteredBooks = books.filter(
-    (book) => book.category.toLowerCase() === category.toLowerCase()
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  const normalizedCategory = category?.toLowerCase();
+
+  const filteredBooks = useMemo(() => {
+    return books.filter(
+      (book) => book.category.toLowerCase() === normalizedCategory
+    );
+  }, [normalizedCategory]);
+
+  const professorPicks = {
+    literature: 3,
+  };
+
+  const professorBook = filteredBooks.find(
+    (book) => book.id === professorPicks[normalizedCategory]
   );
-
-  const featuredBook = filteredBooks[0];
 
   return (
     <>
-      <HomeNavbar />
+      <div className="relative z-50">
+        <HomeNavbar />
+      </div>
 
-      <div className="relative h-[320px] flex items-center justify-center">
+      <div className="relative h-[320px] flex items-center justify-center z-0">
 
         <img
           src={`/images/categories/${category}.png`}
@@ -25,38 +43,36 @@ export default function CategoryBooks() {
 
         <div className="absolute inset-0 bg-black/40"></div>
 
-        <div className="relative backdrop-blur-md bg-white/10 border border-white/20 shadow-xl rounded-2xl px-12 py-8 text-center">
+        <div className="relative z-10 backdrop-blur-md bg-white/10 border border-white/20 shadow-xl rounded-2xl px-12 py-8 text-center">
 
           <h1 className="text-4xl font-bold text-white capitalize">
             {category} Books
           </h1>
 
           <p className="text-gray-200 mt-3 max-w-lg">
-            Explore the best books in {category}. Discover knowledge, stories,
-            and ideas from the world’s most influential authors.
+           Explore a collection of books available in {category} and find titles that match your interests.
           </p>
 
         </div>
       </div>
 
-      <div className="bg-[#f5efe9] px-6 md:px-12 py-10">
+      <div className="bg-[#f5efe9] px-6 md:px-12 py-10 relative z-10">
 
-        {featuredBook && (
+        {professorBook && (
           <div className="relative flex gap-8 p-8 rounded-2xl overflow-hidden shadow-xl mb-12">
 
             <div
               className="absolute inset-0 bg-cover bg-center blur-md scale-110"
-              style={{ backgroundImage: `url(${featuredBook.image})` }}
+              style={{ backgroundImage: `url(${professorBook.image})` }}
             />
 
             <div className="absolute inset-0 bg-black/40" />
 
             <div className="relative flex gap-8 items-center">
 
-              <Link to={`/book/${featuredBook.id}`}>
+              <Link to={`/book/${professorBook.id}`}>
                 <img
-                  src={featuredBook.image}
-                  alt={featuredBook.title}
+                  src={professorBook.image}
                   className="w-40 h-60 object-cover rounded-lg shadow-lg hover:scale-105 transition"
                 />
               </Link>
@@ -64,19 +80,19 @@ export default function CategoryBooks() {
               <div className="text-white max-w-xl">
 
                 <h2 className="text-sm uppercase tracking-widest text-gray-200 mb-2">
-                  Professor's pic
+                  Professor's Pick
                 </h2>
 
                 <h3 className="text-2xl font-bold mb-2">
-                  {featuredBook.title}
+                  {professorBook.title}
                 </h3>
 
                 <p className="text-gray-200 font-medium mb-2">
-                  {featuredBook.author}
+                  {professorBook.author}
                 </p>
 
-                <p className="text-gray-300 text-sm leading-relaxed">
-                  {featuredBook.description}
+                <p className="text-gray-300 text-sm">
+                  {professorBook.description}
                 </p>
 
               </div>
@@ -85,7 +101,6 @@ export default function CategoryBooks() {
           </div>
         )}
 
-        {/* BOOK GRID */}
         <h2 className="text-xl font-bold mb-6">
           All {category} Books
         </h2>

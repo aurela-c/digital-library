@@ -42,11 +42,11 @@ const HomeNavbar = () => {
             <div className="absolute top-full left-0 w-48 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition duration-300">
               <ul className="flex flex-col py-2">
                 {[
-                  "technology",
                   "literature",
-                  "academic",
+                  "technology",
                   "business",
                   "history",
+                  "science",
                   "arts",
                 ].map((cat) => (
                   <li key={cat}>
