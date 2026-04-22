@@ -8,7 +8,36 @@ const router = express.Router();
 const borrowSchema = Joi.object({
   userId: Joi.number().integer().required(),
   bookId: Joi.number().integer().required(),
-});
+  });
+
+  /**
+ * @swagger
+ * /api/v1/borrow:
+ *   post:
+ *     summary: Borrow a book
+ *     description: Allows a user to borrow a book if copies are available.
+ *     tags: [Borrow]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: integer
+ *                 example: 1
+ *               bookId:
+ *                 type: integer
+ *                 example: 5
+ *     responses:
+ *       200:
+ *         description: Book borrowed successfully
+ *       400:
+ *         description: Validation error or no copies available
+ *       404:
+ *         description: Book not found
+ */
 
 router.post("/", async (req, res) => {
   try {
@@ -67,6 +96,25 @@ router.post("/", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/v1/borrow/{userId}:
+ *   get:
+ *     summary: Get borrowed books by user
+ *     description: Returns the borrow history for a specific user.
+ *     tags: [Borrow]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the user
+ *     responses:
+ *       200:
+ *         description: List of borrowed books
+ */
+
 router.get("/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -91,49 +139,6 @@ router.get("/:userId", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-//reutrn
-
-router.put("/return/:id", async (req, res) => {
-  try {
-    const borrowId = req.params.id;
-
-    const borrow = await BorrowedBook.findByPk(borrowId, {
-      include: Book,
-    });
-
-    if (!borrow) {
-      return res.status(404).json({ error: "Borrow record not found" });
-    }
-
-    if (borrow.status === "returned") {
-      return res.status(400).json({ error: "Already returned" });
-    }
-
-
-    await borrow.update({
-      return_date: new Date(),
-      status: "returned",
-    });
-
-
-    const book = await Book.findByPk(borrow.book_id);
-
-    await book.update({
-      available_copies: book.available_copies + 1,
-    });
-
-    res.json({
-      message: "Book returned successfully",
-      borrow,
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
 
 
 export default router;
