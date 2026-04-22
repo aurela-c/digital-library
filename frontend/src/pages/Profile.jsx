@@ -133,7 +133,7 @@ const Profile = () => {
         {activeTab !== "returned" && !book.return_date && (
           <button
             onClick={() => confirmReturn(book.id)}
-            className="mt-3 w-full bg-green-600 text-white py-2 rounded-lg text-xs hover:bg-green-700"
+            className="mt-3 w-full bg-black text-white py-2 rounded-lg text-xs hover:bg-green-700"
           >
             Return Book
           </button>
@@ -272,7 +272,7 @@ const Profile = () => {
                   handleReturn(selectedBorrowId);
                   setShowModal(false);
                 }}
-                className="flex-1 bg-green-600 text-white py-2 rounded-lg"
+                className="flex-1 bg-black text-white py-2 rounded-lg"
               >
                 Return
               </button>
