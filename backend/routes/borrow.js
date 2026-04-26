@@ -2,7 +2,6 @@ import express from "express";
 import Joi from "joi";
 import BorrowedBook from "../models/BorrowedBook.js";
 import Book from "../models/Book.js";
-import NodeCache from "node-cache"; 
 
 const router = express.Router();
 
@@ -11,9 +10,8 @@ const borrowSchema = Joi.object({
   bookId: Joi.number().integer().required(),
 });
 
-const cache = new NodeCache({ stdTTL: 60 });
 
-
+//borrow book
 router.post("/", async (req, res) => {
   try {
     const { userId, bookId } = req.body;
@@ -54,17 +52,9 @@ router.post("/", async (req, res) => {
       available_copies: book.available_copies - 1,
     });
 
-
-    cache.del(`borrowed_${userId}`);
-
     return res.json({
       message: "Book borrowed successfully!",
       borrowed,
-      links: {
-        self: "/api/borrow",
-        history: `/api/borrow/${userId}`,
-        return_book: `/api/borrow/return/${borrowed.id}`,
-      },
     });
 
   } catch (err) {
@@ -74,55 +64,32 @@ router.post("/", async (req, res) => {
 });
 
 
-router.get("/:userId", async (req, res) => {
+// get borrowed book
+router.get("/:id", async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.id;
 
-    const cacheKey = `borrowed_${userId}`;
-    const cachedData = cache.get(cacheKey);
-
-    let data;
-
-    if (cachedData) {
-      console.log(" CACHE HIT");
-      data = cachedData;
-    } else {
-      console.log(" CACHE MISS");
-
-      data = await BorrowedBook.findAll({
-        where: { user_id: userId },
-        include: [
-          {
-            model: Book,
-            attributes: ["id", "title", "author", "image"],
-          },
-        ],
-        order: [["created_at", "DESC"]],
-      });
-
-      cache.set(cacheKey, data);
-    }
-
-    return res.json({
-      source: cachedData ? "cache" : "database",
-      data,
-
-      links: {
-        self: `/api/borrow/${userId}`,
-        borrow: "/api/borrow",
-        login: "/api/auth/login",
-        return_book: "/api/borrow/return/:id",
-        docs: "/api-docs",
-      },
+    const data = await BorrowedBook.findAll({
+      where: { user_id: userId },
+      include: [
+        {
+          model: Book,
+          attributes: ["id", "title", "author", "image"],
+        },
+      ],
+      order: [["created_at", "DESC"]],
     });
 
+    // 🔥 ALWAYS return clean array (important for React)
+    return res.json(data);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error("GET borrow error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-
+// return book
 router.put("/return/:id", async (req, res) => {
   try {
     const borrowId = req.params.id;
@@ -150,20 +117,13 @@ router.put("/return/:id", async (req, res) => {
       available_copies: book.available_copies + 1,
     });
 
-  
-    cache.del(`borrowed_${borrow.user_id}`);
-
     return res.json({
       message: "Book returned successfully",
       borrow,
-      links: {
-        history: `/api/borrow/${borrow.user_id}`,
-        borrow_again: "/api/borrow",
-      },
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("RETURN error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });

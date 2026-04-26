@@ -1,12 +1,13 @@
 import express from "express";
-import { register, login, getUserById  } from "../controllers/authController.js";
+import { register, login } from "../controllers/authController.js";
 import rateLimit from "express-rate-limit";
+import User from "../models/User.js";
 
 const router = express.Router();
 
 const loginLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 5,
+  max: 10,
   message: "Too many login attempts"
 });
 
@@ -41,7 +42,7 @@ router.post("/login",loginLimiter, login);
 
 /**
  * @swagger
- * /api/v1/auth/register:
+ * /api/auth/register:
  *   post:
  *     summary: Register a new user
  *     tags: [Auth]
@@ -50,6 +51,17 @@ router.post("/login",loginLimiter, login);
  *         description: User created successfully
  */
 router.post("/register", register);
+
+router.get("/:id", async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 export default router;

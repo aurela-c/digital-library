@@ -12,25 +12,32 @@ const Register = () => {
     e.preventDefault();
 
     try {
-      await axios.post("http://localhost:5000/api/auth/register", {
-        name,
-        email,
-        password,
-      });
+      await axios.post(
+        "http://localhost:5000/api/v1/auth/register",
+        { name, email, password }
+      );
 
-      alert("Registered successfully!");
+      const loginRes = await axios.post(
+        "http://localhost:5000/api/v1/auth/login",
+        { email, password }
+      );
+
+      localStorage.setItem("userId", loginRes.data.user.id);
+      localStorage.setItem("token", loginRes.data.token);
+      localStorage.setItem("name", loginRes.data.user.name);
+
+      alert("Registered & logged in successfully!");
+
+      navigate("/home");
+
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.error || "Registration failed (demo mode continues)");
+      alert(err.response?.data?.error || "Registration failed");
     }
-
-
-    navigate("/home");
   };
 
   return (
     <div className="min-h-screen bg-[#f5efe9] flex items-center justify-center px-4">
-
       <div className="w-full max-w-3xl min-h-[500px] bg-white shadow-md flex overflow-hidden">
 
         <div className="hidden md:flex relative w-1/2 overflow-hidden">
@@ -39,7 +46,6 @@ const Register = () => {
             alt="Background"
             className="absolute inset-0 w-full h-full object-cover"
           />
-
           <div className="absolute inset-0 bg-black/30"></div>
 
           <div className="relative z-10 flex flex-col justify-center items-start p-10 text-white mt-6">
@@ -59,7 +65,7 @@ const Register = () => {
           </Link>
 
           <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
-            Create your account 
+            Create your account
           </h2>
 
           <form className="space-y-5" onSubmit={handleRegister}>
@@ -70,7 +76,7 @@ const Register = () => {
                 type="text"
                 required
                 placeholder="Your Name"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full px-4 py-2 border rounded-lg"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -82,7 +88,7 @@ const Register = () => {
                 type="email"
                 required
                 placeholder="example@email.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full px-4 py-2 border rounded-lg"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -94,28 +100,26 @@ const Register = () => {
                 type="password"
                 required
                 placeholder="••••••••"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full px-4 py-2 border rounded-lg"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 
             <div className="flex items-center justify-between mt-4">
-
               <button
                 type="submit"
-                className="px-6 py-2 rounded-full bg-red-400 text-white hover:bg-red-500 text-sm"
+                className="px-6 py-2 rounded-full bg-red-400 text-white"
               >
                 Register
               </button>
 
               <Link
                 to="/login"
-                className="px-5 py-2 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm"
+                className="px-5 py-2 rounded-full bg-gray-100 text-gray-700"
               >
                 Already have an account?
               </Link>
-
             </div>
 
           </form>
