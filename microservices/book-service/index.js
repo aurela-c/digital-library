@@ -1,17 +1,30 @@
 import express from "express";
+import cors from "cors";
 import sequelize from "./config/database.js";
-import borrowRoutes from "./routes/borrow.js";
+import bookRoutes from "./routes/bookRoutes.js";
 
 const app = express();
+
+app.use(cors());
 app.use(express.json());
 
-app.use("/", borrowRoutes);
+app.use("/books", bookRoutes);
 
 app.get("/", (req, res) => {
   res.send("Book Service Running");
 });
 
-sequelize.sync().then(() => {
-  console.log("Book DB connected");
-  app.listen(5003, () => console.log("Book service on 5003"));
-});
+const start = async () => {
+  try {
+    await sequelize.sync();
+    console.log("DB synced");
+
+    app.listen(5003, () =>
+      console.log("Book service running on 5003")
+    );
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+start();
