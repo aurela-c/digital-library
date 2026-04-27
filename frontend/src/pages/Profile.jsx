@@ -15,14 +15,13 @@ const Profile = () => {
   const [profileImage] = useState(
     localStorage.getItem(storageKey) || null
   );
-  
+
+  const API = "http://localhost:4000"; 
+
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch(
-          `http://localhost:5000/api/v1/auth/${userId}`
-        );
-
+        const res = await fetch(`${API}/users/${userId}`);
         if (!res.ok) throw new Error("User fetch failed");
 
         const data = await res.json();
@@ -34,15 +33,10 @@ const Profile = () => {
 
     const fetchBorrowed = async () => {
       try {
-        const res = await fetch(
-          `http://localhost:5000/api/v1/borrow/${userId}`
-        );
-
+        const res = await fetch(`${API}/borrow/${userId}`);
         if (!res.ok) throw new Error("Borrow fetch failed");
 
         const data = await res.json();
-
-        
         setBorrowedBooks(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("BORROW ERROR:", err);
@@ -56,15 +50,11 @@ const Profile = () => {
     }
   }, [userId]);
 
-
   const handleReturn = async (id) => {
     try {
-      await fetch(
-        `http://localhost:5000/api/v1/borrow/return/${id}`,
-        {
-          method: "PUT",
-        }
-      );
+      await fetch(`${API}/borrow/return/${id}`, {
+        method: "PUT",
+      });
 
       setBorrowedBooks((prev) =>
         prev.map((b) =>

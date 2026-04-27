@@ -1,9 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api"
+  baseURL: "http://localhost:4000", 
 });
 
-export const getBooks = () => API.get("/books");
-
-export default API;
+export default API;;

@@ -18,7 +18,7 @@ export default function BookCard() {
         return;
       }
 
-      const res = await fetch("http://localhost:5000/api/v1/borrow", {
+      const res = await fetch("http://localhost:4000/borrow ", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

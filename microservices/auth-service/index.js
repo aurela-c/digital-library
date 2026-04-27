@@ -1,59 +1,30 @@
-const express = require("express");
-const axios = require("axios");
+import express from "express";
+import sequelize from "./config/database.js";
+import authRoutes from "./routes/auth.js";
 
 const app = express();
 app.use(express.json());
 
-
-app.use("/auth", async (req, res) => {
-  try {
-    const response = await axios({
-      method: req.method,
-      url: `http://localhost:5001${req.originalUrl.replace("/auth", "")}`,
-      data: req.body,
-    });
-
-    res.json(response.data);
-  } catch (err) {
-    res.status(500).json({ error: "Auth service error" });
-  }
-});
-
-
-app.use("/users", async (req, res) => {
-  try {
-    const response = await axios({
-      method: req.method,
-      url: `http://localhost:5002${req.originalUrl.replace("/users", "")}`,
-      data: req.body,
-    });
-
-    res.json(response.data);
-  } catch (err) {
-    res.status(500).json({ error: "User service error" });
-  }
-});
-
-
-app.use("/books", async (req, res) => {
-  try {
-    const response = await axios({
-      method: req.method,
-      url: `http://localhost:5003${req.originalUrl.replace("/books", "")}`,
-      data: req.body,
-    });
-
-    res.json(response.data);
-  } catch (err) {
-    res.status(500).json({ error: "Book service error" });
-  }
-});
-
+app.use("/", authRoutes);
 
 app.get("/", (req, res) => {
-  res.send("API Gateway Running");
+  res.send("Auth Service Running");
 });
 
-app.listen(5000, () => {
-  console.log("API Gateway running on port 5000");
-});
+const start = async () => {
+  try {
+    await sequelize.authenticate();
+    console.log("DB connected");
+
+    await sequelize.sync();
+    console.log("Models synced");
+
+    app.listen(5001, () => {
+      console.log("Auth service running on port 5001");
+    });
+  } catch (err) {
+    console.error("Startup error:", err);
+  }
+};
+
+start();

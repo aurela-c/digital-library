@@ -1,19 +1,17 @@
-const express = require("express");
-const app = express();
+import express from "express";
+import sequelize from "./config/database.js";
+import borrowRoutes from "./routes/borrow.js";
 
+const app = express();
 app.use(express.json());
+
+app.use("/", borrowRoutes);
 
 app.get("/", (req, res) => {
   res.send("Book Service Running");
 });
 
-app.get("/books", (req, res) => {
-  res.json([
-    { id: 1, title: "Book 1" },
-    { id: 2, title: "Book 2" }
-  ]);
-});
-
-app.listen(5003, () => {
-  console.log("Book service running on port 5003");
+sequelize.sync().then(() => {
+  console.log("Book DB connected");
+  app.listen(5003, () => console.log("Book service on 5003"));
 });
