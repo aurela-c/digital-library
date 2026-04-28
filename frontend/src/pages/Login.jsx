@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import { login } from "../services/api";
+
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -10,27 +11,21 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    try {
-      const res = await axios.post(
-        "http://localhost:4000/auth/login",
-        {
-          email,
-          password,
-        }
-      );
+      try {
+      const res = await login({ email, password });
 
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("userId", res.data.user.id);
-      localStorage.setItem("name", res.data.name);
+      localStorage.setItem("name", res.data.user.name);
 
       alert("Login successful!");
       navigate("/home");
 
     } catch (err) {
-      alert(err.response?.data?.error || "Login failed");
       console.error(err);
+      alert(err.response?.data?.error || "Login failed");
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-[#f5efe9] flex items-center justify-center px-4">
@@ -79,6 +74,7 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
+
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <label className="text-gray-600">Password</label>
@@ -96,24 +92,27 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <div className="flex items-center justify-between mt-4">
 
-              <button
-                type="submit"
-                className="px-6 py-2 rounded-full bg-red-400 text-white hover:bg-red-500 text-sm"
-              >
-                Sign in
-              </button>
+            <div className="flex flex-col gap-3 mt-6">
 
-              <Link
-                to="/register"
-                className="px-5 py-2 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm"
-              >
-                Create account
-              </Link>
+  <button
+    type="submit"
+    className="w-full py-2 rounded-full bg-red-400 text-white hover:bg-red-500 transition text-sm"
+  >
+    Sign in
+  </button>
 
-            </div>
+  <p className="text-xs text-center text-gray-500">
+    Don’t have an account?{" "}
+    <Link
+      to="/register"
+      className="text-red-400 font-medium hover:underline"
+    >
+      Create one
+    </Link>
+  </p>
 
+</div>
           </form>
 
         </div>

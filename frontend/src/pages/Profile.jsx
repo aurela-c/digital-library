@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import API from "../services/api";
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -16,16 +17,12 @@ const Profile = () => {
     localStorage.getItem(storageKey) || null
   );
 
-  const API = "http://localhost:4000"; 
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch(`${API}/users/${userId}`);
-        if (!res.ok) throw new Error("User fetch failed");
-
-        const data = await res.json();
-        setUser(data);
+       const res = await API.get(`/users/${userId}`);
+       setUser(res.data);
       } catch (err) {
         console.error("USER ERROR:", err);
       }
@@ -33,11 +30,8 @@ const Profile = () => {
 
     const fetchBorrowed = async () => {
       try {
-        const res = await fetch(`${API}/borrow/${userId}`);
-        if (!res.ok) throw new Error("Borrow fetch failed");
-
-        const data = await res.json();
-        setBorrowedBooks(Array.isArray(data) ? data : []);
+      const res = await API.get(`/borrow/${userId}`);
+      setBorrowedBooks(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("BORROW ERROR:", err);
         setBorrowedBooks([]);
@@ -52,10 +46,7 @@ const Profile = () => {
 
   const handleReturn = async (id) => {
     try {
-      await fetch(`${API}/borrow/return/${id}`, {
-        method: "PUT",
-      });
-
+    await API.put(`/borrow/return/${id}`);
       setBorrowedBooks((prev) =>
         prev.map((b) =>
           b.id === id

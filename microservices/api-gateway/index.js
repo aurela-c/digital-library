@@ -4,24 +4,30 @@ import cors from "cors";
 
 const app = express();
 
+app.use((req, res, next) => {
+  console.log("HIT:", req.method, req.url);
+  next();
+});
+
+
 app.use(cors({
   origin: "http://localhost:5173",
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
-app.options("*", cors()); 
-
 app.use(express.json());
 
-// auth
+
+
+//auth
 app.use("/auth", async (req, res) => {
   try {
     const response = await axios({
       method: req.method,
-      url: `http://localhost:5001${req.originalUrl.replace("/auth", "")}`,
+      url: `http://localhost:5001${req.originalUrl}`,
       data: req.body,
-      headers: { ...req.headers },
+      headers: req.headers,
     });
 
     res.status(response.status).json(response.data);
@@ -32,14 +38,15 @@ app.use("/auth", async (req, res) => {
   }
 });
 
-// user
+// user service
+
 app.use("/users", async (req, res) => {
   try {
     const response = await axios({
       method: req.method,
-      url: `http://localhost:5002${req.originalUrl.replace("/users", "")}`,
+      url: `http://localhost:5002${req.originalUrl}`,
       data: req.body,
-      headers: { ...req.headers },
+      headers: req.headers,
     });
 
     res.status(response.status).json(response.data);
@@ -50,14 +57,15 @@ app.use("/users", async (req, res) => {
   }
 });
 
-// books
+// book service
+
 app.use("/books", async (req, res) => {
   try {
     const response = await axios({
       method: req.method,
-      url: `http://localhost:5003${req.originalUrl.replace("/books", "")}`,
+      url: `http://localhost:5003${req.originalUrl}`,
       data: req.body,
-      headers: { ...req.headers },
+      headers: req.headers,
     });
 
     res.status(response.status).json(response.data);
@@ -68,14 +76,15 @@ app.use("/books", async (req, res) => {
   }
 });
 
-// borrow
+// borrow service
+
 app.use("/borrow", async (req, res) => {
   try {
     const response = await axios({
       method: req.method,
-      url: `http://localhost:5004${req.originalUrl.replace("/borrow", "")}`,
+      url: `http://localhost:5004${req.originalUrl.replace("/borrow", "")}`, 
       data: req.body,
-      headers: { ...req.headers },
+      headers: req.headers,
     });
 
     res.status(response.status).json(response.data);
@@ -86,11 +95,8 @@ app.use("/borrow", async (req, res) => {
   }
 });
 
-//test
-app.get("/test", (req, res) => {
-  res.json({ message: "API Gateway Working" });
-});
+// server
 
-app.listen(4000, () =>
-  console.log("Gateway running on http://localhost:4000")
-);
+app.listen(4000, () => {
+  console.log("Gateway running on http://localhost:4000");
+});

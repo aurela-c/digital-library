@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { books } from "../data/books";
 import { useParams } from "react-router-dom";
+import API from "../services/api";
 
 export default function BookCard() {
   const { id } = useParams();
@@ -18,30 +19,18 @@ export default function BookCard() {
         return;
       }
 
-      const res = await fetch("http://localhost:4000/borrow ", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: Number(userId),
-          bookId: selectedBook.id,
-        }),
-      });
+      const res = await API.post("/borrow", {
+      userId: Number(userId),
+      bookId: selectedBook.id,
+    });
 
-      const data = await res.json();
+    alert(res.data.message || "Book borrowed successfully!");
 
-      if (!res.ok) {
-        alert(data.error || "Borrow failed");
-        return;
-      }
-
-      alert("Book borrowed successfully!");
-    } catch (err) {
-      console.error(err);
-      alert("Server error");
-    }
-  };
+  } catch (err) {
+    console.error("BORROW ERROR:", err.response?.data || err.message);
+    alert(err.response?.data?.error || "Borrow failed");
+  }
+};
 
   if (!selectedBook) {
     return (

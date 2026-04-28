@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { books } from "../data/books";
+import API from "../services/api";
 
 function PopularNow() {
   const featuredBooks = books.filter((book) => book.featured);
@@ -13,10 +14,9 @@ function PopularNow() {
     }
 
     try {
-      const res = await fetch("http://localhost:4000/borrow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, bookId: book.id }),
+      const res = await await API.post("/borrow", {
+        userId: Number(userId),
+        bookId: book.id,
       });
 
       const data = await res.json();
@@ -24,7 +24,7 @@ function PopularNow() {
       if (res.ok) {
         alert(`You borrowed "${book.title}"!`);
       } else {
-        alert(data.error);
+        alert(data?.error || "Borrow failed");
       }
     } catch (err) {
       console.error(err);

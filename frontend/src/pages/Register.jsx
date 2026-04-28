@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import { register, login } from "../services/api";
 
 const Register = () => {
   const [name, setName] = useState("");
@@ -12,21 +12,15 @@ const Register = () => {
     e.preventDefault();
 
     try {
-      await axios.post(
-        "http://localhost:4000/auth/register",
-        { name, email, password }
-      );
-
-      const loginRes = await axios.post(
-        "http://localhost:4000/auth/login",
-        { email, password }
-      );
+     await register({ name, email, password });
+     
+     const loginRes = await login({ email, password });
 
       localStorage.setItem("userId", loginRes.data.user.id);
       localStorage.setItem("token", loginRes.data.token);
       localStorage.setItem("name", loginRes.data.user.name);
 
-      alert("Registered & logged in successfully!");
+      alert("Registered successfully!");
 
       navigate("/home");
 
@@ -106,22 +100,24 @@ const Register = () => {
               />
             </div>
 
-            <div className="flex items-center justify-between mt-4">
+            <div className="flex flex-col gap-3 mt-6">
               <button
-                type="submit"
-                className="px-6 py-2 rounded-full bg-red-400 text-white"
-              >
-                Register
+              type="submit"
+              className="w-full py-2 rounded-full bg-red-400 text-white hover:bg-red-500 transition">
+              Register
               </button>
-
-              <Link
+              
+              <p className="text-xs text-center text-gray-500">
+                Already have an account?{" "}
+                <Link
                 to="/login"
-                className="px-5 py-2 rounded-full bg-gray-100 text-gray-700"
-              >
-                Already have an account?
-              </Link>
-            </div>
-
+                className="text-red-400 font-medium hover:underline"
+                >
+                  Sign in
+                </Link>
+              </p>
+              </div>
+                  
           </form>
 
         </div>
