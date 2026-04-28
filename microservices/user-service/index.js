@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import sequelize from "./config/database.js";
 import userRoutes from "./routes/user.js";
+import { connectRabbitMQ } from "./rabbitmq.js";
+import { startUserConsumer } from "./consumers/userConsumer.js";
 
 const app = express();
 
@@ -18,6 +20,9 @@ const start = async () => {
   try {
     await sequelize.sync();
     console.log("User DB synced");
+
+    await connectRabbitMQ();
+    startUserConsumer();
 
     app.listen(5002, () =>
       console.log("User service running on port 5002")

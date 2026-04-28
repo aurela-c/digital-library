@@ -1,31 +1,21 @@
 import BorrowedBook from "../models/BorrowedBook.js";
-import axios from "axios";
 import Joi from "joi";
+import { getChannel } from "../rabbitmq.js";
 
 const schema = Joi.object({
   userId: Joi.number().required(),
   bookId: Joi.number().required(),
 });
 
-// BORROW BOOK
+//borrow
 export const borrowBook = async (req, res) => {
   try {
     const { userId, bookId } = req.body;
 
     const { error } = schema.validate({ userId, bookId });
-    if (error) return res.status(400).json({ error: error.message });
-
-    // check book from book-service
-    const bookRes = await axios.get(
-      `http://localhost:5003/books/${bookId}`
-    );
-
-    const book = bookRes.data;
-
-    if (!book) return res.status(404).json({ error: "Book not found" });
-
-    if (book.available_copies <= 0)
-      return res.status(400).json({ error: "No copies available" });
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
 
     const exists = await BorrowedBook.findOne({
       where: {
@@ -35,61 +25,103 @@ export const borrowBook = async (req, res) => {
       },
     });
 
-    if (exists)
-      return res.status(400).json({ error: "Already borrowed" });
+    if (exists) {
+      return res.status(400).json({ error: "Already borrowed this book" });
+    }
 
     const borrow = await BorrowedBook.create({
       user_id: userId,
       book_id: bookId,
+      status: "borrowed",
     });
+    const channel = getChannel();
 
-    await axios.put(
-      `http://localhost:5003/books/decrease/${bookId}`
+    channel.sendToQueue(
+      "BOOK_BORROWED",
+      Buffer.from(
+        JSON.stringify({
+          userId,
+          bookId,
+          borrowId: borrow.id,
+        })
+      )
     );
 
-    res.json({ message: "Borrowed successfully", borrow });
+    console.log("EVENT SENT: BOOK_BORROWED", { userId, bookId });
+
+    return res.status(201).json({
+      message: "Book borrowed successfully",
+      borrow,
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("Borrow error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
-// GET USER BORROWS
+//get user books
 export const getBorrows = async (req, res) => {
   try {
+    const userId = req.params.id;
+
     const data = await BorrowedBook.findAll({
-      where: { user_id: req.params.id },
+      where: { user_id: userId },
       order: [["created_at", "DESC"]],
     });
 
-    res.json(data);
+    return res.json(data);
+
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
-// RETURN BOOK
+//return
 export const returnBook = async (req, res) => {
   try {
     const borrow = await BorrowedBook.findByPk(req.params.id);
 
-    if (!borrow)
-      return res.status(404).json({ error: "Not found" });
+    if (!borrow) {
+      return res.status(404).json({ error: "Borrow record not found" });
+    }
 
-    if (borrow.status === "returned")
-      return res.status(400).json({ error: "Already returned" });
+    if (borrow.status === "returned") {
+      return res.status(400).json({ error: "Book already returned" });
+    }
+
 
     await borrow.update({
       status: "returned",
       return_date: new Date(),
     });
 
-    await axios.put(
-      `http://localhost:5003/books/increase/${borrow.book_id}`
+    const channel = getChannel();
+
+    channel.sendToQueue(
+      "BOOK_RETURNED",
+      Buffer.from(
+        JSON.stringify({
+          userId: borrow.user_id,
+          bookId: borrow.book_id,
+          borrowId: borrow.id,
+        })
+      )
     );
 
-    res.json({ message: "Returned successfully", borrow });
+    console.log("EVENT SENT: BOOK_RETURNED", {
+      userId: borrow.user_id,
+      bookId: borrow.book_id,
+    });
+
+    return res.json({
+      message: "Book returned successfully",
+      borrow,
+    });
+
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    console.error(err);
+    return res.status(500).json({ error: "Server error" });
   }
 };
