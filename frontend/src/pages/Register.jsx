@@ -6,15 +6,22 @@ const Register = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
 
     try {
-     await register({ name, email, password });
-     
-     const loginRes = await login({ email, password });
+      await register({ name, email, password });
+
+      const loginRes = await login({ email, password });
 
       localStorage.setItem("userId", loginRes.data.user.id);
       localStorage.setItem("token", loginRes.data.token);
@@ -23,10 +30,11 @@ const Register = () => {
       alert("Registered successfully!");
 
       navigate("/home");
-
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.error || "Registration failed");
+      setError(err.response?.data?.error || "Registration failed");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,6 +69,12 @@ const Register = () => {
           <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
             Create your account
           </h2>
+
+          {error && (
+            <p className="text-red-500 text-xs text-center mb-2">
+              {error}
+            </p>
+          )}
 
           <form className="space-y-5" onSubmit={handleRegister}>
 
@@ -102,22 +116,24 @@ const Register = () => {
 
             <div className="flex flex-col gap-3 mt-6">
               <button
-              type="submit"
-              className="w-full py-2 rounded-full bg-red-400 text-white hover:bg-red-500 transition">
-              Register
+                type="submit"
+                disabled={loading}
+                className="w-full py-2 rounded-full bg-red-400 text-white hover:bg-red-500 transition disabled:opacity-50"
+              >
+                {loading ? "Registering..." : "Register"}
               </button>
-              
+
               <p className="text-xs text-center text-gray-500">
                 Already have an account?{" "}
                 <Link
-                to="/login"
-                className="text-red-400 font-medium hover:underline"
+                  to="/login"
+                  className="text-red-400 font-medium hover:underline"
                 >
                   Sign in
                 </Link>
               </p>
-              </div>
-                  
+            </div>
+
           </form>
 
         </div>

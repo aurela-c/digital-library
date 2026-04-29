@@ -2,52 +2,70 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login } from "../services/api";
 
-
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-      try {
+    try {
       const res = await login({ email, password });
 
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("userId", res.data.user.id);
-      localStorage.setItem("name", res.data.user.name);
+      const { token, user } = res.data;
+      localStorage.setItem("token", token);
+      localStorage.setItem("userId", user.id);
+      localStorage.setItem("name", user.name);
+      localStorage.setItem("role", user.role); 
 
       alert("Login successful!");
-      navigate("/home");
+
+    
+      if (user.role === "ROLE_ADMIN") {
+        navigate("/admin");
+      } else {
+        navigate("/home");
+      }
 
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.error || "Login failed");
+
+      const msg =
+        err.response?.data?.error ||
+        "Login failed";
+
+      alert(msg);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-[#f5efe9] flex items-center justify-center px-4">
 
       <div className="w-full max-w-3xl min-h-[500px] bg-white shadow-md flex overflow-hidden">
 
+        {/* LEFT IMAGE */}
         <div className="hidden md:flex relative w-1/2 overflow-hidden">
           <img
             src="/images/LoginPhoto.jpg"
             alt="Background"
             className="absolute inset-0 w-full h-full object-cover"
           />
-
           <div className="absolute inset-0 bg-black/30"></div>
 
           <div className="relative z-10 flex flex-col justify-center items-start p-10 text-white mt-6">
-            <h1 className="text-4xl md:text-3xl font-medium leading-tight tracking-tight font-serif">
+            <h1 className="text-4xl md:text-3xl font-serif">
               Welcome <br /> to The Book Club
             </h1>
           </div>
         </div>
 
+        {/* RIGHT FORM */}
         <div className="w-full md:w-1/2 relative flex flex-col justify-center px-10 py-12">
 
           <Link
@@ -68,53 +86,42 @@ const Login = () => {
               <input
                 type="email"
                 required
-                placeholder="example@email.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full px-4 py-2 border rounded-lg"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
             <div>
-              <div className="flex justify-between text-sm mb-1">
-                <label className="text-gray-600">Password</label>
-                <span className="text-gray-400 italic cursor-pointer hover:underline">
-                  Forgot?
-                </span>
-              </div>
-
+              <label className="block text-sm text-gray-600 mb-1">Password</label>
               <input
                 type="password"
                 required
-                placeholder="••••••••"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+                className="w-full px-4 py-2 border rounded-lg"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 
-            <div className="flex flex-col gap-3 mt-6">
+            {/* SUBMIT */}
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-2 rounded-full text-white transition text-sm
+                ${loading ? "bg-gray-400" : "bg-red-400 hover:bg-red-500"}
+              `}
+            >
+              {loading ? "Logging in..." : "Sign in"}
+            </button>
 
-  <button
-    type="submit"
-    className="w-full py-2 rounded-full bg-red-400 text-white hover:bg-red-500 transition text-sm"
-  >
-    Sign in
-  </button>
+            <p className="text-xs text-center text-gray-500">
+              Don’t have an account?{" "}
+              <Link to="/register" className="text-red-400 hover:underline">
+                Create one
+              </Link>
+            </p>
 
-  <p className="text-xs text-center text-gray-500">
-    Don’t have an account?{" "}
-    <Link
-      to="/register"
-      className="text-red-400 font-medium hover:underline"
-    >
-      Create one
-    </Link>
-  </p>
-
-</div>
           </form>
-
         </div>
       </div>
     </div>

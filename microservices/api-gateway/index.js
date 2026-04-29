@@ -3,6 +3,11 @@ import axios from "axios";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import redis from "./redisClient.js";
+import { createBreaker } from "./circuitBreaker.js";
+import jwt from "jsonwebtoken";
+import { verifyToken } from "./middleware/authMiddleware.js";
+
+const ACCESS_SECRET = "ACCESS_SECRET_KEY";
 
 const app = express();
 
@@ -91,6 +96,8 @@ const forwardRequest = async (req, res, serviceUrl, stripPrefix = false) => {
   }
 };
 
+const bookBreaker = createBreaker("http://localhost:5003/books");
+
 //routes
 
 app.get("/", (req, res) => {
@@ -103,17 +110,34 @@ app.use("/auth", (req, res) =>
 );
 
 // USERS
-app.use("/users", (req, res) =>
+app.use("/users", verifyToken, (req, res) =>
   forwardRequest(req, res, "http://localhost:5002")
 );
 
 // BOOKS
-app.use("/books", (req, res) =>
-  forwardRequest(req, res, "http://localhost:5003")
-);
+app.use("/books", async (req, res) => {
+  try {
+    const result = await bookBreaker.fire({
+      method: req.method,
+      url: req.originalUrl,
+      data: req.body,
+      headers: {
+        Authorization: req.headers.authorization || "",
+        "Content-Type": "application/json",
+      },
+    });
+
+    return res.json(result);
+
+  } catch (err) {
+    return res.status(503).json({
+      error: "Book service is unavailable (circuit breaker open)",
+    });
+  }
+});
 
 // BORROW
-app.use("/borrow", (req, res) =>
+app.use("/borrow", verifyToken, (req, res) =>
   forwardRequest(req, res, "http://localhost:5004", true)
 );
 
