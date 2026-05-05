@@ -10,7 +10,8 @@ const schema = Joi.object({
 //borrow
 export const borrowBook = async (req, res) => {
   try {
-    const { userId, bookId } = req.body;
+    const userId = req.user.id; 
+    const { bookId } = req.body;
 
     const { error } = schema.validate({ userId, bookId });
     if (error) {
@@ -34,6 +35,7 @@ export const borrowBook = async (req, res) => {
       book_id: bookId,
       status: "borrowed",
     });
+
     const channel = getChannel();
 
     channel.sendToQueue(
@@ -46,8 +48,6 @@ export const borrowBook = async (req, res) => {
         })
       )
     );
-
-    console.log("EVENT SENT: BOOK_BORROWED", { userId, bookId });
 
     return res.status(201).json({
       message: "Book borrowed successfully",
@@ -63,10 +63,17 @@ export const borrowBook = async (req, res) => {
 //get user books
 export const getBorrows = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const requestedId = req.params.id;
+
+    if (
+      req.user.role !== "ROLE_ADMIN" &&
+      req.user.id != requestedId
+    ) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
 
     const data = await BorrowedBook.findAll({
-      where: { user_id: userId },
+      where: { user_id: requestedId },
       order: [["created_at", "DESC"]],
     });
 
@@ -86,11 +93,17 @@ export const returnBook = async (req, res) => {
     if (!borrow) {
       return res.status(404).json({ error: "Borrow record not found" });
     }
+    
+    if (
+      req.user.role !== "ROLE_ADMIN" &&
+      req.user.id != borrow.user_id
+    ) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
 
     if (borrow.status === "returned") {
       return res.status(400).json({ error: "Book already returned" });
     }
-
 
     await borrow.update({
       status: "returned",
@@ -109,11 +122,6 @@ export const returnBook = async (req, res) => {
         })
       )
     );
-
-    console.log("EVENT SENT: BOOK_RETURNED", {
-      userId: borrow.user_id,
-      bookId: borrow.book_id,
-    });
 
     return res.json({
       message: "Book returned successfully",

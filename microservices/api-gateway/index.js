@@ -4,17 +4,13 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import redis from "./redisClient.js";
 import { createBreaker } from "./circuitBreaker.js";
-import jwt from "jsonwebtoken";
-import { verifyToken } from "./middleware/authMiddleware.js";
-
-const ACCESS_SECRET = "ACCESS_SECRET_KEY";
 
 const app = express();
 
-//redis check
+// redis check
 redis.ping().then(res => console.log("Redis:", res));
 
-//rate limit
+// rate limit
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
@@ -36,6 +32,7 @@ app.use(cors({
 
 app.use(express.json());
 
+// cache middleware
 const cache = async (req, res, next) => {
   if (req.method !== "GET") return next();
 
@@ -55,7 +52,7 @@ const cache = async (req, res, next) => {
 
     res.json = async (data) => {
       if (data) {
-        await redis.setex(key, 60, JSON.stringify(data)); // 60 sec cache
+        await redis.setex(key, 60, JSON.stringify(data));
       }
       return originalJson(data);
     };
@@ -69,7 +66,7 @@ const cache = async (req, res, next) => {
 
 app.use(cache);
 
-
+// generic forwarder
 const forwardRequest = async (req, res, serviceUrl, stripPrefix = false) => {
   try {
     const url = stripPrefix
@@ -98,8 +95,7 @@ const forwardRequest = async (req, res, serviceUrl, stripPrefix = false) => {
 
 const bookBreaker = createBreaker("http://localhost:5003/books");
 
-//routes
-
+// routes
 app.get("/", (req, res) => {
   res.send("API Gateway is running");
 });
@@ -109,12 +105,12 @@ app.use("/auth", (req, res) =>
   forwardRequest(req, res, "http://localhost:5001")
 );
 
-// USERS
-app.use("/users", verifyToken, (req, res) =>
+// USERS 
+app.use("/users", (req, res) =>
   forwardRequest(req, res, "http://localhost:5002")
 );
 
-// BOOKS
+// BOOKS (circuit breaker)
 app.use("/books", async (req, res) => {
   try {
     const result = await bookBreaker.fire({
@@ -136,8 +132,8 @@ app.use("/books", async (req, res) => {
   }
 });
 
-// BORROW
-app.use("/borrow", verifyToken, (req, res) =>
+// BORROW 
+app.use("/borrow", (req, res) =>
   forwardRequest(req, res, "http://localhost:5004", true)
 );
 

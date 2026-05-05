@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { register, login } from "../services/api";
+import { register } from "../services/api";
 
 const Register = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -19,20 +18,20 @@ const Register = () => {
     setError("");
 
     try {
+      // REGISTER ONLY
       await register({ name, email, password });
-
-      const loginRes = await login({ email, password });
-
-      localStorage.setItem("userId", loginRes.data.user.id);
-      localStorage.setItem("token", loginRes.data.token);
-      localStorage.setItem("name", loginRes.data.user.name);
 
       alert("Registered successfully!");
 
-      navigate("/home");
+      // NO AUTO LOGIN (fix bug)
+      navigate("/login");
+
     } catch (err) {
       console.error(err);
+
+      // FIX: ensure string, not object
       setError(err.response?.data?.error || "Registration failed");
+
     } finally {
       setLoading(false);
     }
@@ -51,7 +50,7 @@ const Register = () => {
           <div className="absolute inset-0 bg-black/30"></div>
 
           <div className="relative z-10 flex flex-col justify-center items-start p-10 text-white mt-6">
-            <h1 className="text-4xl md:text-3xl font-medium leading-tight tracking-tight font-serif">
+            <h1 className="text-4xl md:text-3xl font-serif">
               Welcome <br /> to The Book Club
             </h1>
           </div>
@@ -70,6 +69,7 @@ const Register = () => {
             Create your account
           </h2>
 
+          {/* FIX: safe error render */}
           {error && (
             <p className="text-red-500 text-xs text-center mb-2">
               {error}
@@ -83,7 +83,6 @@ const Register = () => {
               <input
                 type="text"
                 required
-                placeholder="Your Name"
                 className="w-full px-4 py-2 border rounded-lg"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -95,7 +94,6 @@ const Register = () => {
               <input
                 type="email"
                 required
-                placeholder="example@email.com"
                 className="w-full px-4 py-2 border rounded-lg"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -107,35 +105,28 @@ const Register = () => {
               <input
                 type="password"
                 required
-                placeholder="••••••••"
                 className="w-full px-4 py-2 border rounded-lg"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 
-            <div className="flex flex-col gap-3 mt-6">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 rounded-full bg-red-400 text-white hover:bg-red-500 transition disabled:opacity-50"
-              >
-                {loading ? "Registering..." : "Register"}
-              </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2 rounded-full bg-red-400 text-white hover:bg-red-500 transition disabled:opacity-50"
+            >
+              {loading ? "Registering..." : "Register"}
+            </button>
 
-              <p className="text-xs text-center text-gray-500">
-                Already have an account?{" "}
-                <Link
-                  to="/login"
-                  className="text-red-400 font-medium hover:underline"
-                >
-                  Sign in
-                </Link>
-              </p>
-            </div>
+            <p className="text-xs text-center text-gray-500">
+              Already have an account?{" "}
+              <Link to="/login" className="text-red-400 hover:underline">
+                Sign in
+              </Link>
+            </p>
 
           </form>
-
         </div>
       </div>
     </div>

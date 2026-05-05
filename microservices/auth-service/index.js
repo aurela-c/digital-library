@@ -1,9 +1,12 @@
 import express from "express";
 import sequelize from "./config/database.js";
 import authRoutes from "./routes/auth.js";
+import dotenv from "dotenv";
+
 
 const app = express();
 app.use(express.json());
+dotenv.config();
 
 app.use("/auth", authRoutes);
 

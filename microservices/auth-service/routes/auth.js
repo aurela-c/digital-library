@@ -4,10 +4,12 @@ import {
   login,
   getUserById,
   refresh,
+  verifyEmail,
+  requestReset,
+  resetPassword,
 } from "../controllers/authController.js";
 
-import { authMiddleware } from "../middleware/authMiddleware.js";
-import { auditLog } from "../middleware/auditMiddleware.js";
+import { auditLog, authMiddleware } from "../middleware/authMiddleware.js";
 import { authorize } from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
@@ -18,6 +20,12 @@ router.post("/login", auditLog("USER_LOGIN"), login);
 
 router.post("/refresh", auditLog("TOKEN_REFRESH"), refresh);
 
+router.get("/verify/:token", verifyEmail);
+
+router.post("/reset-request", requestReset);
+
+router.post("/reset/:token", resetPassword);
+
 router.get(
   "/:id",
   authMiddleware,
@@ -25,7 +33,7 @@ router.get(
   getUserById
 );
 
-//role based routes
+
 router.get(
   "/admin",
   authMiddleware,
@@ -45,11 +53,5 @@ router.get(
     res.json({ message: "User profile access" });
   }
 );
-
-router.get("/verify/:token", verifyEmail);
-
-router.post("/reset-request", requestReset);
-
-router.post("/reset/:token", resetPassword);
 
 export default router;

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login } from "../services/api";
+import { jwtDecode } from "jwt-decode";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -16,16 +17,21 @@ const Login = () => {
     try {
       const res = await login({ email, password });
 
-      const { token, user } = res.data;
-      localStorage.setItem("token", token);
+     
+      const { accessToken, user } = res.data;
+
+  
+      localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("userId", user.id);
       localStorage.setItem("name", user.name);
-      localStorage.setItem("role", user.role); 
+
+     
+      const decoded = jwtDecode(accessToken);
 
       alert("Login successful!");
 
-    
-      if (user.role === "ROLE_ADMIN") {
+      // redirect based on role
+      if (decoded.role === "ROLE_ADMIN") {
         navigate("/admin");
       } else {
         navigate("/home");
@@ -34,11 +40,10 @@ const Login = () => {
     } catch (err) {
       console.error(err);
 
-      const msg =
-        err.response?.data?.error ||
-        "Login failed";
+      alert(
+        err.response?.data?.error || "Login failed"
+      );
 
-      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -103,7 +108,6 @@ const Login = () => {
               />
             </div>
 
-            {/* SUBMIT */}
             <button
               type="submit"
               disabled={loading}
