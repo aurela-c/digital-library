@@ -5,13 +5,14 @@ package auth;
 service AuthService {
   rpc Register (RegisterRequest) returns (AuthResponse);
   rpc Login (LoginRequest) returns (AuthResponse);
-  rpc ValidateToken (TokenRequest) returns (TokenResponse);
 }
 
 message RegisterRequest {
-  string name = 1;
+  string username = 1;
   string email = 2;
   string password = 3;
+  string role = 4;
+  string profileImage = 5;
 }
 
 message LoginRequest {
@@ -22,13 +23,4 @@ message LoginRequest {
 message AuthResponse {
   string userId = 1;
   string token = 2;
-}
-
-message TokenRequest {
-  string token = 1;
-}
-
-message TokenResponse {
-  bool valid = 1;
-  string userId = 2;
 }

@@ -4,6 +4,7 @@ import sequelize from "./config/database.js";
 import bookRoutes from "./routes/bookRoutes.js";
 import { connectRabbitMQ } from "./rabbitmq.js";
 import { startBookConsumer } from "./consumers/bookConsumer.js";
+import "./grpc/bookServer.js";
 
 const app = express();
 

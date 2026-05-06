@@ -1,29 +1,34 @@
 import express from "express";
-import axios from "axios";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import redis from "./redisClient.js";
-import { createBreaker } from "./circuitBreaker.js";
+
+//  IMPORT ROUTES (gRPC-based)
+import authRoutes from "./routes/authRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import bookRoutes from "./routes/bookRoutes.js";
+import borrowRoutes from "./routes/borrowRoutes.js";
 
 const app = express();
 
-// redis check
+// Redis check
 redis.ping().then(res => console.log("Redis:", res));
 
-// rate limit
+// Rate limit
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   message: "Too many requests, try again later",
 });
-
 app.use(limiter);
 
+// Logging
 app.use((req, res, next) => {
   console.log("HIT:", req.method, req.url);
   next();
 });
 
+// CORS
 app.use(cors({
   origin: "http://localhost:5173",
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -32,7 +37,8 @@ app.use(cors({
 
 app.use(express.json());
 
-// cache middleware
+
+//  CACHE 
 const cache = async (req, res, next) => {
   if (req.method !== "GET") return next();
 
@@ -66,76 +72,18 @@ const cache = async (req, res, next) => {
 
 app.use(cache);
 
-// generic forwarder
-const forwardRequest = async (req, res, serviceUrl, stripPrefix = false) => {
-  try {
-    const url = stripPrefix
-      ? `${serviceUrl}${req.originalUrl.replace(req.baseUrl, "")}`
-      : `${serviceUrl}${req.originalUrl}`;
 
-    const response = await axios({
-      method: req.method,
-      url,
-      data: req.body,
-      headers: {
-        Authorization: req.headers.authorization || "",
-        "Content-Type": "application/json",
-      },
-      timeout: 5000,
-    });
+//  ROUTES (gRPC)
+app.use("/auth", authRoutes);
+app.use("/users", userRoutes);
+app.use("/books", bookRoutes);
+app.use("/borrow", borrowRoutes);
 
-    return res.status(response.status).json(response.data);
 
-  } catch (err) {
-    return res.status(err.response?.status || 500).json({
-      error: err.response?.data || "Service error",
-    });
-  }
-};
-
-const bookBreaker = createBreaker("http://localhost:5003/books");
-
-// routes
+// TEST
 app.get("/", (req, res) => {
-  res.send("API Gateway is running");
+  res.send("Gateway (gRPC) running 🚀");
 });
-
-// AUTH
-app.use("/auth", (req, res) =>
-  forwardRequest(req, res, "http://localhost:5001")
-);
-
-// USERS 
-app.use("/users", (req, res) =>
-  forwardRequest(req, res, "http://localhost:5002")
-);
-
-// BOOKS (circuit breaker)
-app.use("/books", async (req, res) => {
-  try {
-    const result = await bookBreaker.fire({
-      method: req.method,
-      url: req.originalUrl,
-      data: req.body,
-      headers: {
-        Authorization: req.headers.authorization || "",
-        "Content-Type": "application/json",
-      },
-    });
-
-    return res.json(result);
-
-  } catch (err) {
-    return res.status(503).json({
-      error: "Book service is unavailable (circuit breaker open)",
-    });
-  }
-});
-
-// BORROW 
-app.use("/borrow", (req, res) =>
-  forwardRequest(req, res, "http://localhost:5004", true)
-);
 
 app.listen(4500, () => {
   console.log("Gateway running on http://localhost:4500");

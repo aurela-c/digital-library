@@ -3,6 +3,7 @@ import cors from "cors";
 import sequelize from "./config/database.js";
 import borrowRoutes from "./routes/borrowRoutes.js";
 import { connectRabbitMQ } from "./rabbitmq.js";
+import "./grpc/borrowServer.js";
 
 const app = express();
 

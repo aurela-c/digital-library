@@ -11,8 +11,6 @@ const ACCESS_SECRET = process.env.ACCESS_SECRET || "ACCESS_SECRET_KEY";
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "REFRESH_SECRET_KEY";
 
 
-// ================= TOKENS =================
-
 const generateAccessToken = (user) => {
   return jwt.sign(
     {
@@ -38,13 +36,10 @@ const generateRefreshToken = (user) => {
 };
 
 
-// ================= REGISTER =================
 
 export const register = async (req, res) => {
-  const { name, email, password } = req.body;
-
   try {
-    console.log("REGISTER BODY:", req.body);
+    const { name, email, password } = req.body;
 
     const exists = await User.findOne({ where: { email } });
 
@@ -64,65 +59,44 @@ export const register = async (req, res) => {
       verificationToken,
     });
 
-    console.log("USER CREATED:", user.id);
-
-    // fallback if BASE_URL missing
     const baseUrl = process.env.BASE_URL || "http://localhost:5001";
-
     const verifyUrl = `${baseUrl}/auth/verify/${verificationToken}`;
 
     try {
       await sendEmail(
         email,
         "Verify your account",
-        `
-        <h2>Welcome to Digital Library</h2>
-        <p>Click below to verify your account:</p>
-        <a href="${verifyUrl}">Verify Account</a>
-        `
+        `<a href="${verifyUrl}">Verify Account</a>`
       );
-    } catch (emailErr) {
-      console.log("EMAIL ERROR:", emailErr.message);
-      // nuk e rrëzon register nëse email dështon
+    } catch (err) {
+      console.log("EMAIL ERROR:", err.message);
     }
 
-    return res.json({
-      message: "User registered successfully. Verify email.",
+    return res.status(201).json({
+      message: "User registered. Check email to verify account.",
     });
 
   } catch (err) {
     console.log("REGISTER ERROR:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
 
-// ================= LOGIN =================
-
 export const login = async (req, res) => {
-  const { email, password } = req.body;
-
   try {
-    console.log("LOGIN BODY:", req.body);
+    const { email, password } = req.body;
 
     const user = await User.findOne({ where: { email } });
 
-    console.log("USER FOUND:", user);
-
     if (!user) {
-      return res.status(400).json({ error: "Invalid email or password" });
-    }
-
-    if (!user.password) {
-      return res.status(500).json({ error: "Password missing in DB" });
+      return res.status(400).json({ error: "Invalid credentials" });
     }
 
     const match = await bcrypt.compare(password, user.password);
 
-    console.log("PASSWORD MATCH:", match);
-
     if (!match) {
-      return res.status(400).json({ error: "Invalid email or password" });
+      return res.status(400).json({ error: "Invalid credentials" });
     }
 
     if (!user.isVerified) {
@@ -137,29 +111,28 @@ export const login = async (req, res) => {
       refreshToken,
       user: {
         id: user.id,
-        name: user.username,
+        username: user.username,
         email: user.email,
         role: user.role,
+        profileImage: user.profileImage,
       },
     });
 
   } catch (err) {
     console.log("LOGIN ERROR:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
 
-// ================= REFRESH =================
-
 export const refresh = (req, res) => {
-  const { token } = req.body;
-
-  if (!token) {
-    return res.status(401).json({ error: "No refresh token" });
-  }
-
   try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(401).json({ error: "No refresh token" });
+    }
+
     const decoded = jwt.verify(token, REFRESH_SECRET);
 
     const newAccessToken = jwt.sign(
@@ -180,18 +153,9 @@ export const refresh = (req, res) => {
 };
 
 
-// ================= GET USER =================
-
 export const getUserById = async (req, res) => {
   try {
     const requestedId = req.params.id;
-
-    if (
-      req.user.role !== "ROLE_ADMIN" &&
-      req.user.id != requestedId
-    ) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
 
     const user = await User.findByPk(requestedId);
 
@@ -201,19 +165,18 @@ export const getUserById = async (req, res) => {
 
     return res.json({
       id: user.id,
-      name: user.username,
+      username: user.username,
       email: user.email,
       role: user.role,
+      profileImage: user.profileImage,
     });
 
   } catch (err) {
     console.log("GET USER ERROR:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
-
-// ================= VERIFY EMAIL =================
 
 export const verifyEmail = async (req, res) => {
   try {
@@ -235,18 +198,15 @@ export const verifyEmail = async (req, res) => {
     return res.json({ message: "Email verified successfully" });
 
   } catch (err) {
-    console.log("VERIFY ERROR:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
 
-// ================= RESET REQUEST =================
-
 export const requestReset = async (req, res) => {
-  const { email } = req.body;
-
   try {
+    const { email } = req.body;
+
     const user = await User.findOne({ where: { email } });
 
     if (!user) {
@@ -272,13 +232,9 @@ export const requestReset = async (req, res) => {
     return res.json({ message: "Reset email sent" });
 
   } catch (err) {
-    console.log("RESET REQUEST ERROR:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Server error" });
   }
 };
-
-
-// ================= RESET PASSWORD =================
 
 export const resetPassword = async (req, res) => {
   try {
@@ -302,7 +258,6 @@ export const resetPassword = async (req, res) => {
     return res.json({ message: "Password reset successful" });
 
   } catch (err) {
-    console.log("RESET ERROR:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Server error" });
   }
 };

@@ -1,33 +1,45 @@
 import User from "../models/User.js";
 
-export const getAllUsers = async (req, res) => {
+export const GetAllUsers = async (call, callback) => {
   try {
     const users = await User.findAll();
-    res.json(users);
+
+    callback(null, {
+      users: users.map((u) => ({
+        id: u.id.toString(),
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        profileImage: u.profileImage,
+        createdAt: u.created_at,
+      })),
+    });
+
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    callback({ code: 13, message: "Server error" });
   }
 };
 
-export const getUserById = async (req, res) => {
+export const GetUserById = async (call, callback) => {
   try {
-    const requestedId = req.params.id;
-
-    if (
-      req.user.role !== "ROLE_ADMIN" &&
-      req.user.id != requestedId
-    ) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
+    const requestedId = call.request.id;
 
     const user = await User.findByPk(requestedId);
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return callback({ code: 5, message: "User not found" });
     }
 
-    res.json(user);
+    callback(null, {
+      id: user.id.toString(),
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      profileImage: user.profileImage,
+      createdAt: user.created_at,
+    });
+
   } catch (err) {
-    res.status(500).json({ error: "Server error" });
+    callback({ code: 13, message: "Server error" });
   }
 };

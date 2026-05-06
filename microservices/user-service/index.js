@@ -4,6 +4,7 @@ import sequelize from "./config/database.js";
 import userRoutes from "./routes/user.js";
 import { connectRabbitMQ } from "./rabbitmq.js";
 import { startUserConsumer } from "./consumers/userConsumer.js";
+import "./grpc/userServer.js";
 
 const app = express();
 

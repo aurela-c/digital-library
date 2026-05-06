@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package borrow;
+
+service BorrowService {
+  rpc BorrowBook (BorrowRequest) returns (BorrowResponse);
+  rpc ReturnBook (ReturnRequest) returns (BorrowResponse);
+  rpc GetBorrowsByUser (UserRequest) returns (BorrowList);
+}
+
+message BorrowRequest {
+  string userId = 1;
+  string bookId = 2;
+}
+
+message ReturnRequest {
+  string userId = 1;
+  string bookId = 2;
+}
+
+message UserRequest {
+  string userId = 1;
+}
+
+message BorrowResponse {
+  string id = 1;
+  string userId = 2;
+  string bookId = 3;
+  string borrowDate = 4;
+  string returnDate = 5;
+  string status = 6;
+}
+
+message BorrowList {
+  repeated BorrowResponse borrows = 1;
+}

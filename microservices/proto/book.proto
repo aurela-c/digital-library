@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package book;
+
+service BookService {
+  rpc GetBook (BookRequest) returns (BookResponse);
+  rpc GetAllBooks (Empty) returns (BookList);
+  rpc AddBook (AddBookRequest) returns (BookResponse);
+  rpc UpdateAvailability (UpdateAvailabilityRequest) returns (BookResponse);
+}
+
+message BookRequest {
+  string id = 1;
+}
+
+message AddBookRequest {
+  string title = 1;
+  string author = 2;
+  string image = 3;
+  string description = 4;
+  string categoryId = 5;
+  int32 totalCopies = 6;
+}
+
+message UpdateAvailabilityRequest {
+  string id = 1;
+  int32 quantity = 2;
+}
+
+message BookResponse {
+  string id = 1;
+  string title = 2;
+  string author = 3;
+  string image = 4;
+  string description = 5;
+  string categoryId = 6;
+  int32 totalCopies = 7;
+  int32 availableCopies = 8;
+  string createdAt = 9;
+}
+
+message BookList {
+  repeated BookResponse books = 1;
+}
+
+message Empty {}
