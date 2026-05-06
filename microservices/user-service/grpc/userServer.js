@@ -1,7 +1,11 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
 import path from "path";
-import User from "../models/User.js";
+
+import {
+  GetAllUsers,
+  GetUserById,
+} from "../controllers/userController.js";
 
 const PROTO_PATH = path.resolve("../proto/user.proto");
 
@@ -10,58 +14,6 @@ const grpcObject = grpc.loadPackageDefinition(packageDef);
 
 const userPackage = grpcObject.user;
 
-const GetAllUsers = async (_, callback) => {
-  try {
-    const users = await User.findAll();
-
-    callback(null, {
-      users: users.map((u) => ({
-        id: u.id.toString(),
-        username: u.username,
-        email: u.email,
-        role: u.role,
-        profileImage: u.profileImage,
-        createdAt: u.created_at,
-      })),
-    });
-
-  } catch (err) {
-    callback({
-      code: 13,
-      message: "Server error",
-    });
-  }
-};
-
-const GetUserById = async (call, callback) => {
-  try {
-    const user = await User.findByPk(call.request.id);
-
-    if (!user) {
-      return callback({
-        code: 5,
-        message: "User not found",
-      });
-    }
-
-    callback(null, {
-      id: user.id.toString(),
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      profileImage: user.profileImage,
-      createdAt: user.created_at,
-    });
-
-  } catch (err) {
-    callback({
-      code: 13,
-      message: "Server error",
-    });
-  }
-};
-
-// gRPC SERVER
 const server = new grpc.Server();
 
 server.addService(userPackage.UserService.service, {
@@ -72,8 +24,13 @@ server.addService(userPackage.UserService.service, {
 server.bindAsync(
   "0.0.0.0:5002",
   grpc.ServerCredentials.createInsecure(),
-  () => {
-    console.log("User gRPC running on 5002");
-    server.start();
+  (err, port) => {
+    if (err) {
+      console.error("gRPC bind error:", err);
+      return;
+    }
+
+    console.log("User gRPC running on", port);
+    console.log("gRPC server ready");
   }
 );

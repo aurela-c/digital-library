@@ -1,4 +1,4 @@
-export const authorize = (...roles) => {
+export const allowRoles  = (...roles) => {
   return (req, res, next) => {
 
     if (!req.user) {

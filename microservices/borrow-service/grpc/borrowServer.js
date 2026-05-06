@@ -9,7 +9,6 @@ import {
 } from "../controllers/borrowController.js";
 
 const PROTO_PATH = path.resolve("../proto/borrow.proto");
-
 const packageDef = protoLoader.loadSync(PROTO_PATH);
 const grpcObject = grpc.loadPackageDefinition(packageDef);
 
@@ -26,8 +25,14 @@ server.addService(borrowPackage.BorrowService.service, {
 server.bindAsync(
   "0.0.0.0:5004",
   grpc.ServerCredentials.createInsecure(),
-  () => {
-    console.log(" Borrow gRPC running on 5004");
-    server.start();
+  (err, port) => {
+    if (err) {
+      console.error("gRPC bind error:", err);
+      return;
+    }
+
+    console.log("Borrow gRPC running on", port);
+
+    console.log("gRPC server ready");
   }
 );

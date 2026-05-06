@@ -1,5 +1,5 @@
-import Borrow from "../models/Borrow.js";
-import bookClient from "../grpc/bookClient.js";
+import Borrow from "../models/BorrowedBook.js";
+
 
 export const BorrowBook = async (call, callback) => {
   try {
@@ -13,16 +13,19 @@ export const BorrowBook = async (call, callback) => {
         });
       }
 
-      if (book.availableCopies <= 0) {
+      const available = Number(book.availableCopies);
+
+      if (!available || available <= 0) {
         return callback({
           code: 9,
           message: "No copies available",
         });
       }
+
       bookClient.UpdateAvailability(
         {
           id: bookId,
-          availableCopies: book.availableCopies - 1,
+          availableCopies: available - 1,
         },
         async (err2) => {
           if (err2) {
@@ -32,29 +35,37 @@ export const BorrowBook = async (call, callback) => {
             });
           }
 
-          const borrow = await Borrow.create({
-            user_id: userId,
-            book_id: bookId,
-            borrow_date: new Date(),
-            return_date: null,
-            status: "BORROWED",
-          });
+          try {
+            const borrow = await Borrow.create({
+              user_id: userId,
+              book_id: bookId,
+              borrow_date: new Date(),
+              return_date: null,
+              status: "BORROWED",
+            });
 
-          callback(null, {
-            id: borrow.id.toString(),
-            userId: borrow.user_id,
-            bookId: borrow.book_id,
-            borrowDate: borrow.borrow_date,
-            returnDate: borrow.return_date,
-            status: borrow.status,
-          });
+            return callback(null, {
+              id: borrow.id.toString(),
+              userId: borrow.user_id,
+              bookId: borrow.book_id,
+              borrowDate: borrow.borrow_date,
+              status: borrow.status,
+            });
+
+          } catch (dbErr) {
+            return callback({
+              code: 13,
+              message: "Borrow DB insert failed",
+            });
+          }
         }
       );
     });
+
   } catch (err) {
-    callback({
+    return callback({
       code: 13,
-      message: "Server error",
+      message: err.message || "Server error",
     });
   }
 };

@@ -3,9 +3,9 @@ import protoLoader from "@grpc/proto-loader";
 import path from "path";
 
 import {
-  GetAllBooks,
-  GetBook,
   AddBook,
+  GetBook,
+  GetAllBooks,
   UpdateAvailability,
 } from "../controllers/bookController.js";
 
@@ -19,17 +19,23 @@ const bookPackage = grpcObject.book;
 const server = new grpc.Server();
 
 server.addService(bookPackage.BookService.service, {
-  GetAllBooks,
-  GetBook,
   AddBook,
+  GetBook,
+  GetAllBooks,
   UpdateAvailability,
 });
 
 server.bindAsync(
   "0.0.0.0:5003",
   grpc.ServerCredentials.createInsecure(),
-  () => {
-    console.log(" Book gRPC running on 5003");
-    server.start();
+  (err, port) => {
+    if (err) {
+      console.error("gRPC bind error:", err);
+      return;
+    }
+
+    console.log("Book gRPC running on", port);
+
+    console.log("gRPC server ready");
   }
 );
