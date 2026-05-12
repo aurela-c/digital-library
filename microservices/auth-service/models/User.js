@@ -50,10 +50,27 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+
+    profileImage: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    accountStatus: {
+      type: DataTypes.STRING(16),
+      allowNull: false,
+      defaultValue: "ACTIVE",
+      validate: {
+        isIn: [["ACTIVE", "INACTIVE", "BANNED"]],
+      },
+    },
   },
   {
-    tableName: "users",
-    timestamps: true, 
+    // Dedicated table: user-service also uses MySQL "users" with a smaller
+    // schema; sharing one table causes missing-column / sync conflicts and
+    // breaks auth register/login.
+    tableName: "auth_users",
+    timestamps: true,
   }
 );
 

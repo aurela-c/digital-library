@@ -1,12 +1,15 @@
 FROM node:20
 
-WORKDIR /app
+WORKDIR /workspace
 
-COPY package*.json ./
+COPY observability ./observability
+COPY proto ./proto
+COPY auth-service ./auth-service
+
+WORKDIR /workspace/auth-service
+
 RUN npm install
-
-COPY . .
 
 EXPOSE 5001
 
-CMD ["node", "server.js"]
+CMD ["node", "index.js"]

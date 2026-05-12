@@ -1,15 +1,16 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
-import path from "path";
 
 import {
   AddBook,
   GetBook,
   GetAllBooks,
   UpdateAvailability,
+  DeleteBook,
 } from "../controllers/bookController.js";
+import { resolveProtoPath } from "./resolveProtoPath.js";
 
-const PROTO_PATH = path.resolve("../proto/book.proto");
+const PROTO_PATH = resolveProtoPath("book.proto");
 
 const packageDef = protoLoader.loadSync(PROTO_PATH);
 const grpcObject = grpc.loadPackageDefinition(packageDef);
@@ -23,6 +24,7 @@ server.addService(bookPackage.BookService.service, {
   GetBook,
   GetAllBooks,
   UpdateAvailability,
+  DeleteBook,
 });
 
 server.bindAsync(
@@ -34,8 +36,8 @@ server.bindAsync(
       return;
     }
 
+    server.start();
     console.log("Book gRPC running on", port);
-
     console.log("gRPC server ready");
   }
 );

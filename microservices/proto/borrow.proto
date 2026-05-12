@@ -14,8 +14,9 @@ message BorrowRequest {
 }
 
 message ReturnRequest {
-  string userId = 1;
-  string bookId = 2;
+  string borrowId = 1;
+  string actorUserId = 2;
+  string actorRole = 3;
 }
 
 message UserRequest {
@@ -29,6 +30,9 @@ message BorrowResponse {
   string borrowDate = 4;
   string returnDate = 5;
   string status = 6;
+  string bookTitle = 7;
+  string bookAuthor = 8;
+  string bookImage = 9;
 }
 
 message BorrowList {

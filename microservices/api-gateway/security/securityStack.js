@@ -1,7 +1,6 @@
 import express from "express";
 import { helmetConfig } from "./helmetConfig.js";
 import { rateLimiter } from "./rateLimiter.js";
-import { xssSanitizer } from "./xssSanitizer.js";
 import { httpsRedirect } from "./httpsRedirect.js";
 
 export const securityStack = (app) => {
@@ -17,6 +16,6 @@ export const securityStack = (app) => {
   // Body parsing
   app.use(express.json({ limit: "10kb" })); // anti payload abuse
 
-  // XSS protection
-  app.use(xssSanitizer);
+  // Note: global xss-clean was removed — it mutates JSON bodies and breaks
+  // auth and other API POST payloads. Sanitize at display time in the UI instead.
 };

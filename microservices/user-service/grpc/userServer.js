@@ -1,13 +1,13 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
-import path from "path";
 
 import {
   GetAllUsers,
   GetUserById,
 } from "../controllers/userController.js";
+import { resolveProtoPath } from "./resolveProtoPath.js";
 
-const PROTO_PATH = path.resolve("../proto/user.proto");
+const PROTO_PATH = resolveProtoPath("user.proto");
 
 const packageDef = protoLoader.loadSync(PROTO_PATH);
 const grpcObject = grpc.loadPackageDefinition(packageDef);
@@ -30,6 +30,7 @@ server.bindAsync(
       return;
     }
 
+    server.start();
     console.log("User gRPC running on", port);
     console.log("gRPC server ready");
   }

@@ -1,12 +1,9 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
-import path from "path";
-import { fileURLToPath } from "url";
+import { resolveProtoPath } from "../config/resolveProtoPath.js";
+import { GRPC_TARGETS } from "../config/grpcTargets.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const PROTO_PATH = path.join(__dirname, "../../proto/book.proto");
+const PROTO_PATH = resolveProtoPath("book.proto");
 
 const packageDef = protoLoader.loadSync(PROTO_PATH);
 const grpcObject = grpc.loadPackageDefinition(packageDef);
@@ -14,7 +11,7 @@ const grpcObject = grpc.loadPackageDefinition(packageDef);
 const bookPackage = grpcObject.book;
 
 const client = new bookPackage.BookService(
-  "localhost:5003",
+  GRPC_TARGETS.book,
   grpc.credentials.createInsecure()
 );
 

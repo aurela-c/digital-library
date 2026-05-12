@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login } from "../services/api";
 import { jwtDecode } from "jwt-decode";
+import { AuthContext } from "../../context/AuthContext.jsx";
+import { toast } from "react-toastify";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -9,6 +11,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const { loginUser } = useContext(AuthContext);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -17,45 +20,42 @@ const Login = () => {
     try {
       const res = await login({ email, password });
 
-     
-      const { accessToken, user } = res.data;
+      const { accessToken, refreshToken, user } = res.data;
 
-  
-      localStorage.setItem("accessToken", accessToken);
-      localStorage.setItem("userId", user.id);
-      localStorage.setItem("name", user.name);
+      loginUser(accessToken, refreshToken, user);
 
-     
       const decoded = jwtDecode(accessToken);
 
-      alert("Login successful!");
+      toast.success("Login successful!");
 
-      // redirect based on role
       if (decoded.role === "ROLE_ADMIN") {
         navigate("/admin");
       } else {
         navigate("/home");
       }
-
     } catch (err) {
       console.error(err);
 
-      alert(
-        err.response?.data?.error || "Login failed"
-      );
+      const data = err.response?.data;
+      const msg =
+        typeof data?.error === "string"
+          ? data.error
+          : data?.error != null
+            ? JSON.stringify(data.error)
+            : err.message || "Login failed";
 
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f5efe9] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#f5efe9] flex items-center justify-center px-4 overflow-x-hidden">
 
-      <div className="w-full max-w-3xl min-h-[500px] bg-white shadow-md flex overflow-hidden">
+      <div className="w-full max-w-3xl min-h-[500px] bg-white shadow-md flex flex-col md:flex-row overflow-hidden">
 
-        {/* LEFT IMAGE */}
-        <div className="hidden md:flex relative w-1/2 overflow-hidden">
+        <div className="hidden md:flex relative w-full md:w-1/2 overflow-hidden">
           <img
             src="/images/LoginPhoto.jpg"
             alt="Background"
@@ -63,24 +63,23 @@ const Login = () => {
           />
           <div className="absolute inset-0 bg-black/30"></div>
 
-          <div className="relative z-10 flex flex-col justify-center items-start p-10 text-white mt-6">
-            <h1 className="text-4xl md:text-3xl font-serif">
+          <div className="relative z-10 flex flex-col justify-center items-start p-6 md:p-10 text-white mt-6">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-serif">
               Welcome <br /> to The Book Club
             </h1>
           </div>
         </div>
 
-        {/* RIGHT FORM */}
-        <div className="w-full md:w-1/2 relative flex flex-col justify-center px-10 py-12">
+        <div className="w-full md:w-1/2 relative flex flex-col justify-center px-6 md:px-10 py-10 md:py-12">
 
           <Link
             to="/"
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold"
+            className="absolute top-3 right-3 md:top-4 md:right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold"
           >
             &times;
           </Link>
 
-          <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
+          <h2 className="text-xl md:text-2xl font-bold text-center mb-6 text-gray-800">
             Log in to your account
           </h2>
 

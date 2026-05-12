@@ -1,28 +1,85 @@
 version: "3.8"
 
+networks:
+  app_net:
+    driver: bridge
+
 services:
 
   auth-service:
-    build: ./auth-service
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
     ports:
       - "5001:5001"
+    networks:
+      - app_net
 
   user-service:
-    build: ./user-service
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
     ports:
       - "5002:5002"
+    networks:
+      - app_net
 
   book-service:
-    build: ./book-service
+    build:
+      context: .
+      dockerfile: book-service/Dockerfile
     ports:
       - "5003:5003"
+    networks:
+      - app_net
 
   borrow-service:
-    build: ./borrow-service
+    build:
+      context: .
+      dockerfile: borrow-service/Dockerfile
     ports:
       - "5004:5004"
+    networks:
+      - app_net
 
   gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     ports:
-      - "4500:4500"
+      - "4000:4000"
+    networks:
+      - app_net
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - app_net
+    depends_on:
+      - gateway
+      - auth-service
+      - user-service
+      - book-service
+      - borrow-service
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+    networks:
+      - app_net
+    depends_on:
+      - prometheus

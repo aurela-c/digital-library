@@ -1,12 +1,15 @@
 FROM node:20
 
-WORKDIR /app
+WORKDIR /workspace
 
-COPY package*.json ./
+COPY observability ./observability
+COPY proto ./proto
+COPY book-service ./book-service
+
+WORKDIR /workspace/book-service
+
 RUN npm install
-
-COPY . .
 
 EXPOSE 5003
 
-CMD ["node", "server.js"]
+CMD ["node", "index.js"]

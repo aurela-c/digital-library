@@ -1,6 +1,14 @@
 import { Link } from "react-router-dom";
 import { books } from "../data/books";
 import API from "../services/api";
+import PageContainer from "./layout/PageContainer";
+import {
+  bookTileCard,
+  bookTileImage,
+  bookTileTitle,
+  bookTileAuthor,
+  bookBorrowBtn,
+} from "./layout/BookCardStyles";
 
 function PopularNow() {
   const featuredBooks = books.filter((book) => book.featured);
@@ -14,62 +22,55 @@ function PopularNow() {
     }
 
     try {
-      const res = await await API.post("/borrow", {
-        userId: Number(userId),
-        bookId: book.id,
+      await API.post("/borrow", {
+        bookId: String(book.id),
       });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        alert(`You borrowed "${book.title}"!`);
-      } else {
-        alert(data?.error || "Borrow failed");
-      }
+      alert(`You borrowed "${book.title}"!`);
     } catch (err) {
       console.error(err);
-      alert("Failed to borrow book.");
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to borrow book.";
+      alert(msg);
     }
   };
 
   return (
-    <div id="popular-now" className="mt-10 px-4 md:px-10">
-      <h2 className="text-2xl font-bold text-[#D34F4E] mb-6">
-        Popular Now
-      </h2>
+    <section id="popular-now" className="mt-8 sm:mt-10">
+      <PageContainer>
+        <h2 className="text-xl sm:text-2xl font-bold text-[#D34F4E] mb-4 sm:mb-6">
+          Popular Now
+        </h2>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6">
-        {featuredBooks.map((book) => (
-          <div
-            key={book.id}
-            className="bg-white shadow-md p-3 hover:shadow-lg transition"
-          >
-            <Link to={`/book/${book.id}`}>
-              <img
-                src={book.image}
-                alt={book.title}
-                className="w-full h-52 object-cover hover:scale-105 transition"
-              />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
+          {featuredBooks.map((book) => (
+            <div key={book.id} className={bookTileCard}>
+              <Link to={`/book/${book.id}`} className="block min-w-0">
+                <img
+                  src={book.image}
+                  alt={book.title}
+                  className={bookTileImage}
+                />
 
-              <h3 className="mt-3 font-semibold text-sm">
-                {book.title}
-              </h3>
+                <h3 className={bookTileTitle}>{book.title}</h3>
 
-              <p className="text-gray-500 text-xs">
-                {book.author}
-              </p>
-            </Link>
+                <p className={bookTileAuthor}>{book.author}</p>
+              </Link>
 
-            <div
-              onClick={() => handleBorrow(book)}
-              className="inline-flex bg-[#D34F4E] mt-2 text-white text-sm font-medium px-8 rounded-sm hover:bg-black transition cursor-pointer"
-            >
-              Borrow
+              <button
+                type="button"
+                onClick={() => handleBorrow(book)}
+                className={bookBorrowBtn}
+              >
+                Borrow
+              </button>
             </div>
-          </div>
-        ))}
-      </div>
-    </div>
+          ))}
+        </div>
+      </PageContainer>
+    </section>
   );
 }
 

@@ -1,69 +1,73 @@
 import Borrow from "../models/BorrowedBook.js";
+import { promisify } from "util";
+import bookClient from "../grpc/bookClient.js";
 
+const getBookAsync = promisify(bookClient.GetBook.bind(bookClient));
+const updateAvailabilityAsync = promisify(
+  bookClient.UpdateAvailability.bind(bookClient)
+);
 
+const isBorrowedStatus = (status) =>
+  String(status || "").toUpperCase() === "BORROWED";
+
+async function bookSnippetForId(bookId) {
+  try {
+    const book = await getBookAsync({ id: String(bookId) });
+    return {
+      bookTitle: book.title || "",
+      bookAuthor: book.author || "",
+      bookImage: book.image || "",
+    };
+  } catch {
+    return { bookTitle: "", bookAuthor: "", bookImage: "" };
+  }
+}
 export const BorrowBook = async (call, callback) => {
   try {
     const { userId, bookId } = call.request;
 
-    bookClient.GetBook({ id: bookId }, (err, book) => {
-      if (err) {
-        return callback({
-          code: 5,
-          message: "Book not found",
-        });
-      }
+    // 📌 get book
+    const book = await getBookAsync({ id: bookId });
 
-      const available = Number(book.availableCopies);
+    const available = Number(book.availableCopies);
 
-      if (!available || available <= 0) {
-        return callback({
-          code: 9,
-          message: "No copies available",
-        });
-      }
+    if (!available || available <= 0) {
+      return callback({
+        code: 9,
+        message: "No copies available",
+      });
+    }
 
-      bookClient.UpdateAvailability(
-        {
-          id: bookId,
-          availableCopies: available - 1,
-        },
-        async (err2) => {
-          if (err2) {
-            return callback({
-              code: 13,
-              message: "Failed to update book stock",
-            });
-          }
+    await updateAvailabilityAsync({
+      id: bookId,
+      availableCopies: available - 1,
+    });
 
-          try {
-            const borrow = await Borrow.create({
-              user_id: userId,
-              book_id: bookId,
-              borrow_date: new Date(),
-              return_date: null,
-              status: "BORROWED",
-            });
+  
+    const borrow = await Borrow.create({
+      user_id: userId,
+      book_id: bookId,
+      borrow_date: new Date(),
+      return_date: null,
+      status: "BORROWED",
+    });
 
-            return callback(null, {
-              id: borrow.id.toString(),
-              userId: borrow.user_id,
-              bookId: borrow.book_id,
-              borrowDate: borrow.borrow_date,
-              status: borrow.status,
-            });
+    const snippet = await bookSnippetForId(bookId);
 
-          } catch (dbErr) {
-            return callback({
-              code: 13,
-              message: "Borrow DB insert failed",
-            });
-          }
-        }
-      );
+    callback(null, {
+      id: borrow.id.toString(),
+      userId: String(borrow.user_id),
+      bookId: String(borrow.book_id),
+      borrowDate: borrow.borrow_date,
+      returnDate: borrow.return_date,
+      status: borrow.status,
+      ...snippet,
     });
 
   } catch (err) {
-    return callback({
+    console.error("BorrowBook ERROR:", err.message);
+
+    callback({
       code: 13,
       message: err.message || "Server error",
     });
@@ -72,62 +76,58 @@ export const BorrowBook = async (call, callback) => {
 
 export const ReturnBook = async (call, callback) => {
   try {
-    const { userId, bookId } = call.request;
+    const { borrowId, actorUserId, actorRole } = call.request;
 
-    const borrow = await Borrow.findOne({
-      where: {
-        user_id: userId,
-        book_id: bookId,
-        status: "BORROWED",
-      },
-    });
+    if (!borrowId || !actorUserId) {
+      return callback({
+        code: 3,
+        message: "borrowId and actorUserId are required",
+      });
+    }
 
-    if (!borrow) {
+    const borrow = await Borrow.findByPk(borrowId);
+
+    if (!borrow || !isBorrowedStatus(borrow.status)) {
       return callback({
         code: 5,
         message: "Borrow record not found",
       });
     }
 
-    bookClient.GetBook({ id: bookId }, (err, book) => {
-      if (err) {
-        return callback({
-          code: 5,
-          message: "Book not found",
-        });
-      }
+    const isAdmin = String(actorRole) === "ROLE_ADMIN";
+    if (!isAdmin && String(borrow.user_id) !== String(actorUserId)) {
+      return callback({
+        code: 7,
+        message: "Forbidden",
+      });
+    }
 
-      bookClient.UpdateAvailability(
-        {
-          id: bookId,
-          availableCopies: book.availableCopies + 1,
-        },
-        async (err2) => {
-          if (err2) {
-            return callback({
-              code: 13,
-              message: "Failed to update book stock",
-            });
-          }
+    const bookId = String(borrow.book_id);
+    const book = await getBookAsync({ id: bookId });
 
-          await borrow.update({
-            status: "RETURNED",
-            return_date: new Date(),
-          });
-
-          callback(null, {
-            id: borrow.id.toString(),
-            userId: borrow.user_id,
-            bookId: borrow.book_id,
-            borrowDate: borrow.borrow_date,
-            returnDate: borrow.return_date,
-            status: borrow.status,
-          });
-        }
-      );
+    await updateAvailabilityAsync({
+      id: bookId,
+      availableCopies: Number(book.availableCopies) + 1,
     });
 
+    await borrow.update({
+      status: "RETURNED",
+      return_date: new Date(),
+    });
+
+    await borrow.reload();
+
+    callback(null, {
+      id: borrow.id.toString(),
+      userId: borrow.user_id,
+      bookId: borrow.book_id,
+      borrowDate: borrow.borrow_date,
+      returnDate: borrow.return_date,
+      status: borrow.status,
+    });
   } catch (err) {
+    console.error("ReturnBook ERROR:", err.message);
+
     callback({
       code: 13,
       message: "Server error",
@@ -137,22 +137,44 @@ export const ReturnBook = async (call, callback) => {
 
 export const GetBorrowsByUser = async (call, callback) => {
   try {
-    const borrows = await Borrow.findAll({
-      where: { user_id: call.request.userId },
+    const { userId } = call.request;
+    const page = Math.max(1, Number(call.request.page) || 1);
+    const limit = Math.min(500, Math.max(1, Number(call.request.limit) || 200));
+
+    const offset = (page - 1) * limit;
+
+    const result = await Borrow.findAndCountAll({
+      where: { user_id: userId },
+      limit,
+      offset,
+      order: [["borrow_date", "DESC"]],
     });
 
+    const borrows = await Promise.all(
+      result.rows.map(async (b) => {
+        const snippet = await bookSnippetForId(b.book_id);
+        return {
+          id: b.id.toString(),
+          userId: String(b.user_id),
+          bookId: String(b.book_id),
+          borrowDate: b.borrow_date,
+          returnDate: b.return_date,
+          status: b.status,
+          ...snippet,
+        };
+      })
+    );
+
     callback(null, {
-      borrows: borrows.map((b) => ({
-        id: b.id.toString(),
-        userId: b.user_id,
-        bookId: b.book_id,
-        borrowDate: b.borrow_date,
-        returnDate: b.return_date,
-        status: b.status,
-      })),
+      total: result.count,
+      page,
+      pages: Math.ceil(result.count / limit),
+      borrows,
     });
 
   } catch (err) {
+    console.error("GetBorrowsByUser ERROR:", err.message);
+
     callback({
       code: 13,
       message: "Server error",

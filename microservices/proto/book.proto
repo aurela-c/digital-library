@@ -7,6 +7,7 @@ service BookService {
   rpc GetAllBooks (Empty) returns (BookList);
   rpc AddBook (AddBookRequest) returns (BookResponse);
   rpc UpdateAvailability (UpdateAvailabilityRequest) returns (BookResponse);
+  rpc DeleteBook (BookRequest) returns (Empty);
 }
 
 message BookRequest {
@@ -25,6 +26,7 @@ message AddBookRequest {
 message UpdateAvailabilityRequest {
   string id = 1;
   int32 quantity = 2;
+  int32 availableCopies = 3;
 }
 
 message BookResponse {

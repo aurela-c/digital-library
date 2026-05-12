@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { register } from "../services/api";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const Register = () => {
   const [name, setName] = useState("");
@@ -8,40 +10,44 @@ const Register = () => {
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
 
     try {
-      // REGISTER ONLY
       await register({ name, email, password });
 
-      alert("Registered successfully!");
+      toast.success("Registered successfully!");
 
-      // NO AUTO LOGIN (fix bug)
-      navigate("/login");
-
+      setTimeout(() => {
+        navigate("/login");
+      }, 1200);
     } catch (err) {
       console.error(err);
 
-      // FIX: ensure string, not object
-      setError(err.response?.data?.error || "Registration failed");
+      const data = err.response?.data;
+      const msg =
+        typeof data?.error === "string"
+          ? data.error
+          : data?.error != null
+            ? JSON.stringify(data.error)
+            : err.message || "Registration failed";
 
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f5efe9] flex items-center justify-center px-4">
-      <div className="w-full max-w-3xl min-h-[500px] bg-white shadow-md flex overflow-hidden">
+    <div className="min-h-screen min-h-[100dvh] bg-[#f5efe9] flex items-center justify-center px-3 sm:px-4 py-8 overflow-x-hidden">
 
-        <div className="hidden md:flex relative w-1/2 overflow-hidden">
+      <div className="w-full max-w-3xl min-h-0 bg-white shadow-md rounded-xl sm:rounded-none flex flex-col md:flex-row overflow-hidden">
+
+        <div className="hidden md:flex relative w-full md:w-1/2 overflow-hidden">
           <img
             src="/images/LoginPhoto.jpg"
             alt="Background"
@@ -49,32 +55,25 @@ const Register = () => {
           />
           <div className="absolute inset-0 bg-black/30"></div>
 
-          <div className="relative z-10 flex flex-col justify-center items-start p-10 text-white mt-6">
-            <h1 className="text-4xl md:text-3xl font-serif">
+          <div className="relative z-10 flex flex-col justify-center items-start p-6 md:p-10 text-white mt-6">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-serif">
               Welcome <br /> to The Book Club
             </h1>
           </div>
         </div>
 
-        <div className="w-full md:w-1/2 relative flex flex-col justify-center px-10 py-12">
+        <div className="w-full md:w-1/2 relative flex flex-col justify-center px-6 md:px-10 py-10 md:py-12">
 
           <Link
             to="/"
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold"
+            className="absolute top-3 right-3 md:top-4 md:right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold"
           >
             &times;
           </Link>
 
-          <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
+          <h2 className="text-xl md:text-2xl font-bold text-center mb-6 text-gray-800">
             Create your account
           </h2>
-
-          {/* FIX: safe error render */}
-          {error && (
-            <p className="text-red-500 text-xs text-center mb-2">
-              {error}
-            </p>
-          )}
 
           <form className="space-y-5" onSubmit={handleRegister}>
 
@@ -114,7 +113,7 @@ const Register = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2 rounded-full bg-red-400 text-white hover:bg-red-500 transition disabled:opacity-50"
+              className="w-full min-h-[48px] py-3 rounded-full bg-red-400 text-white hover:bg-red-500 transition disabled:opacity-50 text-sm sm:text-base font-semibold touch-manipulation"
             >
               {loading ? "Registering..." : "Register"}
             </button>

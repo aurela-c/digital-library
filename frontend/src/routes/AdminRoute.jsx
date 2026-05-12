@@ -12,13 +12,19 @@ const AdminRoute = ({ children }) => {
   try {
     const decoded = jwtDecode(token);
 
-    if (decoded.role !== "ROLE_ADMIN") {
+    if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("user");
+      return <Navigate to="/login" replace />;
+    }
+
+    const role = String(decoded.role || "").trim();
+    if (role !== "ROLE_ADMIN") {
       return <Navigate to="/home" replace />;
     }
 
     return children;
-
-  } catch (err) {
+  } catch {
     return <Navigate to="/login" replace />;
   }
 };

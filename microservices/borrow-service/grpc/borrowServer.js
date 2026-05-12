@@ -1,14 +1,13 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
-import path from "path";
-
 import {
   BorrowBook,
   ReturnBook,
   GetBorrowsByUser,
 } from "../controllers/borrowController.js";
+import { resolveProtoPath } from "./resolveProtoPath.js";
 
-const PROTO_PATH = path.resolve("../proto/borrow.proto");
+const PROTO_PATH = resolveProtoPath("borrow.proto");
 const packageDef = protoLoader.loadSync(PROTO_PATH);
 const grpcObject = grpc.loadPackageDefinition(packageDef);
 
@@ -31,8 +30,8 @@ server.bindAsync(
       return;
     }
 
+    server.start();
     console.log("Borrow gRPC running on", port);
-
     console.log("gRPC server ready");
   }
 );

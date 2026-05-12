@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import PageContainer from "./layout/PageContainer";
 
 const categories = [
   "literature",
@@ -12,8 +13,7 @@ const categories = [
 
 export default function Categories() {
   return (
-    <div className="mt-16 relative py-12 w-full overflow-hidden">
-
+    <section className="mt-12 sm:mt-16 relative py-10 sm:py-12 w-full overflow-hidden">
       <div
         className="absolute inset-0 bg-cover bg-center"
         style={{
@@ -23,36 +23,39 @@ export default function Categories() {
 
       <div className="absolute inset-0 bg-black/50" />
 
-      <div className="relative flex flex-col items-center px-6">
-
-        <h2 className="text-3xl font-bold text-white mb-10 text-center">
+      <PageContainer className="relative py-4">
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6 sm:mb-10 text-center px-2">
           Explore Categories
         </h2>
 
-        <div className="grid grid-cols-3 gap-5 max-w-2xl w-full">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 md:gap-5 max-w-3xl mx-auto w-full">
           {categories.map((cat, index) => (
             <Link
               key={index}
               to={`/categories/${cat}`}
               className="
                 bg-white/60
-                text-gray-600
+                text-gray-700
                 font-semibold
                 text-center
-                py-5
+                text-xs sm:text-sm
+                py-4 sm:py-5
+                px-2
+                rounded-lg
                 shadow-md
                 cursor-pointer
                 transition
                 hover:shadow-[0_0_20px_rgba(255,255,255,0.35)]
-                hover:scale-105
+                hover:scale-[1.02]
+                active:scale-[0.98]
+                min-h-[52px] flex items-center justify-center
               "
             >
               {cat.toUpperCase()}
             </Link>
           ))}
         </div>
-
-      </div>
-    </div>
+      </PageContainer>
+    </section>
   );
 }

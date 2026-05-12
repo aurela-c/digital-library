@@ -1,0 +1,13 @@
+export const ROLES = Object.freeze({
+  ADMIN: "ROLE_ADMIN",
+  USER: "ROLE_USER",
+  LIBRARIAN: "ROLE_LIBRARIAN",
+});
+
+export const BORROW_ACTOR_ROLES = [
+  ROLES.USER,
+  ROLES.ADMIN,
+  ROLES.LIBRARIAN,
+];
+
+export const STAFF_BOOK_ROLES = [ROLES.ADMIN, ROLES.LIBRARIAN];

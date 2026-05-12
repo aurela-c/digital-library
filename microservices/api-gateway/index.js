@@ -1,53 +1,92 @@
 import express from "express";
 import cors from "cors";
-import redis from "./redisClient.js";
-import { getService } from "./serviceDiscovery.js";
 import axios from "axios";
+import redis from "./redisClient.js";
 import { securityStack } from "./security/securityStack.js";
+import { resolveHttpServiceUrl } from "./config/serviceUrls.js";
+import userRoutes from "./routes/userRoutes.js";
+import bookRoutes from "./routes/bookRoutes.js";
+import borrowRoutes from "./routes/borrowRoutes.js";
+import { printExpressStack } from "./utils/printRoutes.js";
+import {
+  createLogger,
+  registerProcessHandlers,
+  correlationIdMiddleware,
+  createMetricsBundle,
+  createRequestLogMiddleware,
+  createHealthHandler,
+  createErrorHandler,
+  notFoundHandler,
+} from "../observability/index.js";
+
 const app = express();
 
-// SECURITY STACK
+const logger = createLogger("api-gateway");
+registerProcessHandlers(logger);
+const metrics = createMetricsBundle("api-gateway");
+
+app.use(correlationIdMiddleware);
+app.use(metrics.middleware);
+app.get("/metrics", metrics.handler);
+
 securityStack(app);
 
-// Redis check
-redis.ping().then(res => console.log("Redis:", res));
+app.use(createRequestLogMiddleware(logger));
 
-// LOGGING
-app.use((req, res, next) => {
-  console.log("HIT:", req.method, req.url);
-  next();
-});
+redis
+  .ping()
+  .then((r) => logger.info({ redis: r }, "redis ping"))
+  .catch((e) => logger.warn({ err: e.message }, "redis unavailable"));
 
-// CORS
-app.use(cors({
-  origin: "http://localhost:5173",
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}));
+const parseCorsOrigins = () => {
+  const raw = process.env.CORS_ORIGIN;
+  if (raw) {
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return ["http://localhost:5173", "http://localhost:5174"];
+};
 
-app.use(express.json());
+app.use(
+  cors({
+    origin(origin, callback) {
+      const allowed = parseCorsOrigins();
+      if (!origin) {
+        return callback(null, true);
+      }
+      if (allowed.includes(origin)) {
+        return callback(null, true);
+      }
+      if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+      if (/^http:\/\/localhost:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
+    exposedHeaders: ["X-Request-Id"],
+  })
+);
 
-
-// CACHE MIDDLEWARE
 const cache = async (req, res, next) => {
   if (req.method !== "GET") return next();
+  if (req.headers.authorization) return next();
 
   const key = req.originalUrl;
 
   try {
     const cached = await redis.get(key);
-
     if (cached) {
-      console.log("CACHE HIT:", key);
+      logger.debug({ key }, "cache hit");
       return res.json(JSON.parse(cached));
     }
-
-    console.log("CACHE MISS:", key);
 
     const originalJson = res.json.bind(res);
 
     res.json = async (data) => {
-      if (data) {
+      if (data !== undefined) {
         await redis.setex(key, 60, JSON.stringify(data));
       }
       return originalJson(data);
@@ -55,80 +94,114 @@ const cache = async (req, res, next) => {
 
     next();
   } catch (err) {
-    console.log("CACHE ERROR:", err.message);
+    logger.warn({ err: err.message, key }, "cache error");
     next();
   }
 };
 
 app.use(cache);
 
-// GATEWAY ROUTING (CONSUL)
-
-// AUTH
 app.use("/auth", async (req, res) => {
-  const url = await getService("auth-service");
+  try {
+    if (process.env.DEBUG_AUTH === "true") {
+      const keys =
+        req.body && typeof req.body === "object" ? Object.keys(req.body) : [];
+      logger.debug(
+        { method: req.method, path: req.originalUrl, bodyKeys: keys },
+        "auth proxy"
+      );
+    }
 
-  const response = await axios({
-    method: req.method,
-    url: `${url}${req.originalUrl}`,
-    data: req.body,
-    headers: req.headers,
-  });
+    const base = await resolveHttpServiceUrl(
+      process.env.AUTH_SERVICE_URL,
+      "auth-service",
+      5001
+    );
 
-  res.status(response.status).json(response.data);
+    const forwardHeaders = {};
+    if (req.headers.authorization) {
+      forwardHeaders.authorization = req.headers.authorization;
+    }
+    if (req.headers["content-type"]) {
+      forwardHeaders["content-type"] = req.headers["content-type"];
+    }
+    if (req.correlationId) {
+      forwardHeaders["x-request-id"] = req.correlationId;
+    }
+
+    const response = await axios({
+      method: req.method,
+      url: `${base}${req.originalUrl}`,
+      params: req.query,
+      data:
+        req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
+      headers: forwardHeaders,
+      validateStatus: () => true,
+      timeout: Number(process.env.AUTH_PROXY_TIMEOUT_MS) || 30000,
+    });
+
+    if (typeof response.data === "object" && response.data !== null) {
+      return res.status(response.status).json(response.data);
+    }
+
+    return res.status(response.status).send(response.data);
+  } catch (err) {
+    logger.error(
+      { err: err.message, correlationId: req.correlationId },
+      "auth proxy failure"
+    );
+    return res.status(502).json({ error: "Auth service unavailable" });
+  }
 });
 
+app.use("/users", userRoutes);
+app.use("/books", bookRoutes);
+app.use("/borrow", borrowRoutes);
 
-// USERS
-app.use("/users", async (req, res) => {
-  const url = await getService("user-service");
+app.get(
+  "/health",
+  createHealthHandler({
+    serviceName: "api-gateway",
+    checks: [
+      {
+        key: "redis",
+        run: async () => {
+          const r = await redis.ping();
+          return { ok: Boolean(r), status: r ? "CONNECTED" : "DOWN" };
+        },
+      },
+      {
+        key: "authService",
+        run: async () => {
+          const base = await resolveHttpServiceUrl(
+            process.env.AUTH_SERVICE_URL,
+            "auth-service",
+            5001
+          );
+          const r = await axios.get(`${base}/health`, {
+            timeout: 5000,
+            validateStatus: () => true,
+          });
+          const ok = r.status === 200 && r.data?.status === "UP";
+          return {
+            ok,
+            status: ok ? "REACHABLE" : `HTTP_${r.status}`,
+          };
+        },
+      },
+    ],
+  })
+);
 
-  const response = await axios({
-    method: req.method,
-    url: `${url}${req.originalUrl}`,
-    data: req.body,
-    headers: req.headers,
-  });
-
-  res.status(response.status).json(response.data);
-});
-
-
-// BOOKS
-app.use("/books", async (req, res) => {
-  const url = await getService("book-service");
-
-  const response = await axios({
-    method: req.method,
-    url: `${url}${req.originalUrl}`,
-    data: req.body,
-    headers: req.headers,
-  });
-
-  res.status(response.status).json(response.data);
-});
-
-
-// BORROW
-app.use("/borrow", async (req, res) => {
-  const url = await getService("borrow-service");
-
-  const response = await axios({
-    method: req.method,
-    url: `${url}${req.originalUrl}`,
-    data: req.body,
-    headers: req.headers,
-  });
-
-  res.status(response.status).json(response.data);
-});
-
-
-// ROOT
 app.get("/", (req, res) => {
-  res.send("Gateway (Consul + gRPC + Microservices) 🚀");
+  res.send("Gateway (Consul + gRPC + Microservices) ");
 });
 
-app.listen(4500, () => {
-  console.log("Gateway running on http://localhost:4500");
+app.use(notFoundHandler);
+app.use(createErrorHandler(logger));
+
+const port = Number(process.env.PORT) || 4000;
+printExpressStack(app, "api-gateway");
+app.listen(port, () => {
+  logger.info({ port }, "api-gateway listening");
 });

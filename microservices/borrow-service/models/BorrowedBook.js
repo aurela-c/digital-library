@@ -21,7 +21,7 @@ const BorrowedBook = sequelize.define(
 
     status: {
       type: DataTypes.STRING,
-      defaultValue: "borrowed",
+      defaultValue: "BORROWED",
     },
   },
   {

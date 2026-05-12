@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import PageContainer from "./layout/PageContainer";
 
 const events = [
   {
@@ -45,10 +46,12 @@ export default function Events() {
   }, []);
 
   useEffect(() => {
-    if (sliderRef.current) {
-      sliderRef.current.scrollTo({
-        left: activeIndex * 320,
+    const el = sliderRef.current?.children?.[activeIndex];
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({
         behavior: "smooth",
+        inline: "center",
+        block: "nearest",
       });
     }
   }, [activeIndex]);
@@ -62,72 +65,77 @@ export default function Events() {
   };
 
   return (
-    <div className="relative bg-[#D34F4E] py-12 text-white w-full overflow-hidden">
+    <section className="relative bg-[#D34F4E] py-10 sm:py-12 text-white w-full overflow-hidden">
+      <PageContainer>
+        <h2 className="text-2xl sm:text-3xl font-bold text-center mb-6 sm:mb-10 px-2">
+          Upcoming Events
+        </h2>
+      </PageContainer>
 
-      <h2 className="text-3xl font-bold text-center mb-10">
-        Upcoming Events
-      </h2>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={scrollLeft}
+          className="absolute left-1 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 z-20 bg-white text-[#D34F4E] w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow flex items-center justify-center touch-manipulation"
+          aria-label="Previous event"
+        >
+          ←
+        </button>
 
-  
-      <button
-        onClick={scrollLeft}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white text-[#D34F4E] w-6 h-6 rounded-full shadow"
-      >
-         ←
-      </button>
+        <button
+          type="button"
+          onClick={scrollRight}
+          className="absolute right-1 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 z-20 bg-white text-[#D34F4E] w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow flex items-center justify-center touch-manipulation"
+          aria-label="Next event"
+        >
+          →
+        </button>
 
-   
-      <button
-        onClick={scrollRight}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white text-[#D34F4E] w-6 h-6 rounded-full shadow"
-      >
-         →
-      </button>
+        <div
+          ref={sliderRef}
+          className="flex gap-4 sm:gap-6 px-2 sm:px-4 md:px-8 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {events.map((event) => (
+            <Link
+              key={event.id}
+              to={`/events/${event.id}`}
+              className="relative shrink-0 w-[min(88vw,320px)] sm:w-72 snap-center min-h-[300px] sm:min-h-[340px] max-h-[420px] rounded-xl overflow-hidden shadow-lg"
+            >
+              <img
+                src={event.image}
+                alt={event.title}
+                className="w-full h-full min-h-[300px] object-cover"
+              />
 
+              <div className="absolute inset-0 bg-black/40" />
 
-      <div
-        ref={sliderRef}
-        className="flex gap-6 px-10 overflow-hidden scroll-smooth"
-      >
-        {events.map((event) => (
-          <Link
-            key={event.id}
-            to={`/events/${event.id}`}
-            className="relative min-w-[300px] h-[380px] overflow-hidden shadow-lg"
-          >
-            <img
-              src={event.image}
-              alt={event.title}
-              className="w-full h-full object-cover"
-            />
+              <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-white">
+                <h3 className="text-base sm:text-lg font-bold mb-1 line-clamp-2">
+                  {event.title}
+                </h3>
 
-            <div className="absolute inset-0 bg-black/40" />
-
-            <div className="absolute bottom-0 p-4 text-white">
-              <h3 className="text-lg font-bold mb-1">
-                {event.title}
-              </h3>
-
-              <p className="text-sm leading-tight">
-                {event.description}
-              </p>
-            </div>
-          </Link>
-        ))}
+                <p className="text-xs sm:text-sm leading-snug line-clamp-4 sm:line-clamp-5">
+                  {event.description}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
 
-      <div className="flex justify-center gap-2 mt-8">
+      <div className="flex justify-center gap-2 mt-6 sm:mt-8 flex-wrap px-4">
         {events.map((_, index) => (
           <button
             key={index}
+            type="button"
             onClick={() => setActiveIndex(index)}
-            className={`w-2.5 h-2.5 rounded-full transition ${
+            className={`w-2.5 h-2.5 rounded-full transition touch-manipulation ${
               activeIndex === index ? "bg-white" : "bg-white/40"
             }`}
+            aria-label={`Go to event ${index + 1}`}
           />
         ))}
       </div>
-
-    </div>
+    </section>
   );
 }

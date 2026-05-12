@@ -1,15 +1,9 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
-import path from "path";
-import { fileURLToPath } from "url";
+import { resolveProtoPath } from "../config/resolveProtoPath.js";
+import { GRPC_TARGETS } from "../config/grpcTargets.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const PROTO_PATH = path.join(
-  __dirname,
-  "../../proto/user.proto"
-);
+const PROTO_PATH = resolveProtoPath("user.proto");
 
 const packageDef = protoLoader.loadSync(PROTO_PATH);
 const grpcObject = grpc.loadPackageDefinition(packageDef);
@@ -17,7 +11,7 @@ const grpcObject = grpc.loadPackageDefinition(packageDef);
 const userPackage = grpcObject.user;
 
 const client = new userPackage.UserService(
-  "localhost:5002",
+  GRPC_TARGETS.user,
   grpc.credentials.createInsecure()
 );
 
