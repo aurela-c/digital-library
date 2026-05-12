@@ -1,7 +1,4 @@
-/**
- * Logs Express app stack (routes + middleware order) for debugging mounts.
- * Set PRINT_ROUTES=true on startup to enable.
- */
+
 export function printExpressStack(app, label) {
   if (String(process.env.PRINT_ROUTES || "").toLowerCase() !== "true") {
     return;

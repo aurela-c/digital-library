@@ -73,6 +73,9 @@ const start = async () => {
     await sequelize.sync();
     logger.info("sequelize models synced");
 
+    const { startAuthGrpcServer } = await import("./grpc/authServer.js");
+    await startAuthGrpcServer(logger);
+
     app.listen(5001, () => {
       logger.info({ port: 5001 }, "auth-service listening");
       printExpressStack(app, "auth-service");

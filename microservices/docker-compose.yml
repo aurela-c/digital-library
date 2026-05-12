@@ -12,6 +12,9 @@ services:
       dockerfile: auth-service/Dockerfile
     ports:
       - "5001:5001"
+      - "5010:5010"
+    environment:
+      AUTH_GRPC_PORT: "5010"
     networks:
       - app_net
 
@@ -48,6 +51,8 @@ services:
       dockerfile: api-gateway/Dockerfile
     ports:
       - "4000:4000"
+    environment:
+      AUTH_SERVICE_GRPC: auth-service:5010
     networks:
       - app_net
 

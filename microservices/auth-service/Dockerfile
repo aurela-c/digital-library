@@ -10,6 +10,6 @@ WORKDIR /workspace/auth-service
 
 RUN npm install
 
-EXPOSE 5001
+EXPOSE 5001 5010
 
 CMD ["node", "index.js"]

@@ -14,7 +14,6 @@ export async function resolveHttpServiceUrl(envUrl, consulName, fallbackPort) {
       return `http://${svc.ServiceAddress}:${svc.ServicePort}`;
     }
   } catch {
-    // Consul unavailable — use local dev default
   }
 
   return `http://127.0.0.1:${fallbackPort}`;

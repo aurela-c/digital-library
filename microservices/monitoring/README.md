@@ -40,6 +40,8 @@ Install dependencies in each service after adding `pino` and `prom-client`.
 |----------|---------|
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error` (default `info`) |
 | `NODE_ENV` | `production` hides error stacks from JSON API responses |
+| `AUTH_SERVICE_GRPC` | (api-gateway) Target for auth gRPC, e.g. `auth-service:5010` or `localhost:5010` |
+| `AUTH_GRPC_PORT` | (auth-service) gRPC listen port (default `5010`; HTTP REST stays on `5001`) |
 
 ## Grafana dashboards
 

@@ -10,9 +10,7 @@ function buildTransport() {
   });
 }
 
-/**
- * Health check: verify SMTP credentials when configured.
- */
+
 export async function verifyEmailTransport() {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     return { ok: true, status: "NOT_CONFIGURED" };

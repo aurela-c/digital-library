@@ -2,9 +2,14 @@ syntax = "proto3";
 
 package auth;
 
+// gRPC contract for auth-service (service-to-service and gateway integrations).
+// Browser-facing REST remains on HTTP /auth/* on the same host.
+
 service AuthService {
   rpc Register (RegisterRequest) returns (AuthResponse);
   rpc Login (LoginRequest) returns (AuthResponse);
+  rpc RefreshToken (RefreshRequest) returns (AuthResponse);
+  rpc ValidateAccessToken (ValidateTokenRequest) returns (ValidateTokenResponse);
 }
 
 message RegisterRequest {
@@ -20,7 +25,37 @@ message LoginRequest {
   string password = 2;
 }
 
+message RefreshRequest {
+  string refreshToken = 1;
+}
+
+message ValidateTokenRequest {
+  string accessToken = 1;
+}
+
+message UserProfile {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string role = 4;
+  string profileImage = 5;
+  string accountStatus = 6;
+}
+
 message AuthResponse {
-  string userId = 1;
-  string token = 2;
+  bool ok = 1;
+  string errorMessage = 2;
+  string userId = 3;
+  string accessToken = 4;
+  string refreshToken = 5;
+  UserProfile user = 6;
+  string message = 7;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string userId = 2;
+  string role = 3;
+  string email = 4;
+  string errorMessage = 5;
 }

@@ -8,6 +8,8 @@ import userRoutes from "./routes/userRoutes.js";
 import bookRoutes from "./routes/bookRoutes.js";
 import borrowRoutes from "./routes/borrowRoutes.js";
 import { printExpressStack } from "./utils/printRoutes.js";
+import authClient from "./grpc-clients/authClient.js";
+import { promisify } from "util";
 import {
   createLogger,
   registerProcessHandlers,
@@ -187,6 +189,23 @@ app.get(
             ok,
             status: ok ? "REACHABLE" : `HTTP_${r.status}`,
           };
+        },
+      },
+      {
+        key: "authGrpc",
+        run: async () => {
+          const stub = authClient;
+          const fn =
+            (typeof stub.validateAccessToken === "function" &&
+              stub.validateAccessToken.bind(stub)) ||
+            (typeof stub.ValidateAccessToken === "function" &&
+              stub.ValidateAccessToken.bind(stub));
+          if (!fn) {
+            return { ok: false, status: "MISSING_GRPC_STUB" };
+          }
+          const validate = promisify(fn);
+          await validate({ accessToken: "health-probe-invalid" });
+          return { ok: true, status: "REACHABLE" };
         },
       },
     ],
