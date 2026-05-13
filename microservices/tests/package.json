@@ -7,7 +7,8 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "test:load": "k6 run load/k6-smoke.js"
+    "test:load": "node load/node-load-smoke.js",
+    "test:load:k6": "k6 run load/k6-smoke.js"
   },
   "devDependencies": {
     "axios": "^1.7.9",

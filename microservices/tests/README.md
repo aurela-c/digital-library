@@ -7,7 +7,8 @@ Black-box tests against the **API gateway** (default `http://127.0.0.1:4000`). R
 | Tool | Use |
 |------|-----|
 | **Jest** + **axios** | Integration / functional / edge / validation / security |
-| **k6** | Load / concurrency (`load/k6-smoke.js`) |
+| **Node** + **axios** | Default load smoke (`npm run test:load`) |
+| **k6** (optional) | Heavier load script (`load/k6-smoke.js`) via `npm run test:load:k6` |
 
 ## Setup
 
@@ -36,16 +37,32 @@ npm test
 # Rate-limit test (optional; hammers /auth/login)
 set RUN_RATE_LIMIT_TEST=true
 npm test
-
-# k6 (install from https://k6.io/)
-set INTEGRATION_GATEWAY_URL=http://127.0.0.1:4000
-k6 run load/k6-smoke.js
 ```
 
-From repo root (after adding script):
+## Load testing
+
+**Default (no extra install):** Node + axios concurrent workers:
+
+```bash
+cd microservices/tests
+npm run test:load
+```
+
+Optional env: `LOAD_CONCURRENCY`, `LOAD_ROUNDS`, `LOAD_MAX_FAIL_RATE`, `INTEGRATION_GATEWAY_URL`.
+
+**k6** (install the `k6` binary from https://k6.io/, then):
+
+```bash
+cd microservices/tests
+set INTEGRATION_GATEWAY_URL=http://127.0.0.1:4000
+npm run test:load:k6
+```
+
+From repo root:
 
 ```bash
 npm run test:integration
+npm run test:load
 ```
 
 ## Structure
@@ -54,7 +71,7 @@ npm run test:integration
 tests/
   helpers/           env + HTTP client
   integration/       *.test.js (Jest)
-  load/              k6-smoke.js
+  load/              node-load-smoke.js, k6-smoke.js
 ```
 
 ## Notes

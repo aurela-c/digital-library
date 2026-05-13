@@ -6,6 +6,5 @@ export default {
   testTimeout: 45000,
   verbose: true,
   transform: {},
-  extensionsToTreatAsEsm: [".js"],
   moduleNameMapper: {},
 };
