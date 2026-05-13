@@ -1,0 +1,11 @@
+{
+  "name": "digital-library-observability",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared logging and Prometheus metrics for microservices",
+  "dependencies": {
+    "pino": "^9.6.0",
+    "prom-client": "^15.1.3"
+  }
+}

@@ -1,6 +1,3 @@
-/**
- * Builds /health JSON: merges each check's `key` → status string; 503 if any !ok.
- */
 export function createHealthHandler({ serviceName, checks }) {
   return async (req, res) => {
     const started = Date.now();

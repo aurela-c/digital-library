@@ -6,11 +6,16 @@
     "cors": "^2.8.6",
     "mysql2": "^3.20.0",
     "nodemon": "^3.1.14",
+    "pino-pretty": "^13.1.3",
     "react-router-dom": "^7.13.2"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.27",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.2"
+  },
+  "scripts": {
+    "test:integration": "npm run test --prefix microservices/tests",
+    "test:load": "npm run test:load --prefix microservices/tests"
   }
 }

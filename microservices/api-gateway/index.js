@@ -103,7 +103,7 @@ const cache = async (req, res, next) => {
 
 app.use(cache);
 
-app.use("/auth", async (req, res) => {
+const authHttpProxy = async (req, res) => {
   try {
     if (process.env.DEBUG_AUTH === "true") {
       const keys =
@@ -131,9 +131,15 @@ app.use("/auth", async (req, res) => {
       forwardHeaders["x-request-id"] = req.correlationId;
     }
 
+    const [pathname, ...queryParts] = req.originalUrl.split("?");
+    const querySuffix =
+      queryParts.length > 0 ? `?${queryParts.join("?")}` : "";
+    const upstreamPath = pathname.replace(/^\/api(?=\/auth\b)/, "");
+    const forwardUrl = `${base}${upstreamPath}${querySuffix}`;
+
     const response = await axios({
       method: req.method,
-      url: `${base}${req.originalUrl}`,
+      url: forwardUrl,
       params: req.query,
       data:
         req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
@@ -154,7 +160,10 @@ app.use("/auth", async (req, res) => {
     );
     return res.status(502).json({ error: "Auth service unavailable" });
   }
-});
+};
+
+app.use("/auth", authHttpProxy);
+app.use("/api/auth", authHttpProxy);
 
 app.use("/users", userRoutes);
 app.use("/books", bookRoutes);

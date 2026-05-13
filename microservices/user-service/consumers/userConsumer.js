@@ -2,6 +2,10 @@ import { getChannel } from "../rabbitmq.js";
 
 export const startUserConsumer = () => {
   const channel = getChannel();
+  if (!channel) {
+    console.warn("startUserConsumer: no RabbitMQ channel");
+    return;
+  }
 
   // borrowed
   channel.assertQueue("BOOK_BORROWED");

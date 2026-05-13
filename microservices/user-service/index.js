@@ -60,8 +60,12 @@ const start = async () => {
     await sequelize.sync();
     logger.info("models synced");
 
-    await connectRabbitMQ();
-    startUserConsumer();
+    const mq = await connectRabbitMQ();
+    if (mq) {
+      startUserConsumer();
+    } else {
+      logger.warn("RabbitMQ unavailable — event consumers not started");
+    }
 
     app.listen(5002, () => {
       logger.info({ port: 5002 }, "user-service listening");

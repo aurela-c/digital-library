@@ -1,6 +1,4 @@
-/**
- * Global process-level logging for uncaught errors (process still exits on uncaughtException by default).
- */
+
 export function registerProcessHandlers(logger) {
   process.on("uncaughtException", (err) => {
     logger.fatal(

@@ -26,13 +26,19 @@ docker compose up --build
 
 ## Local development (without Docker)
 
-Run each service from its folder; the repo layout resolves `../observability`:
+Install shared observability dependencies once (so `pino` / `prom-client` resolve from `microservices/observability/`):
+
+```bash
+cd microservices/observability && npm install
+```
+
+Then run each service from its folder; imports resolve `../observability`:
 
 ```bash
 cd microservices/auth-service && npm install && node index.js
 ```
 
-Install dependencies in each service after adding `pino` and `prom-client`.
+Each service still has its own `npm install` for service-specific packages.
 
 ## Environment
 

@@ -1,8 +1,5 @@
 import pino from "pino";
 
-/**
- * Centralized structured JSON logger (stdout) — ship to Grafana Loki / ELK via your log pipeline.
- */
 export function createLogger(serviceName) {
   const level = process.env.LOG_LEVEL || "info";
 

@@ -32,9 +32,6 @@ server.addService(authPackage.AuthService.service, {
 
 const port = Number(process.env.AUTH_GRPC_PORT || 5010);
 
-/**
- * Starts Auth gRPC server (separate TCP port from HTTP REST on 5001).
- */
 export function startAuthGrpcServer(logger) {
   return new Promise((resolve, reject) => {
     server.bindAsync(

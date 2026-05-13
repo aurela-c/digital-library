@@ -27,8 +27,10 @@ server.addService(bookPackage.BookService.service, {
   DeleteBook,
 });
 
+const grpcPort = Number(process.env.BOOK_GRPC_PORT || 5013);
+
 server.bindAsync(
-  "0.0.0.0:5003",
+  `0.0.0.0:${grpcPort}`,
   grpc.ServerCredentials.createInsecure(),
   (err, port) => {
     if (err) {
@@ -36,7 +38,6 @@ server.bindAsync(
       return;
     }
 
-    server.start();
     console.log("Book gRPC running on", port);
     console.log("gRPC server ready");
   }

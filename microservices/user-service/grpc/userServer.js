@@ -21,8 +21,10 @@ server.addService(userPackage.UserService.service, {
   GetUserById,
 });
 
+const grpcPort = Number(process.env.USER_GRPC_PORT || 5012);
+
 server.bindAsync(
-  "0.0.0.0:5002",
+  `0.0.0.0:${grpcPort}`,
   grpc.ServerCredentials.createInsecure(),
   (err, port) => {
     if (err) {

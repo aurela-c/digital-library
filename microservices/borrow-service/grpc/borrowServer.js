@@ -21,8 +21,10 @@ server.addService(borrowPackage.BorrowService.service, {
   GetBorrowsByUser,
 });
 
+const grpcPort = Number(process.env.BORROW_GRPC_PORT || 5014);
+
 server.bindAsync(
-  "0.0.0.0:5004",
+  `0.0.0.0:${grpcPort}`,
   grpc.ServerCredentials.createInsecure(),
   (err, port) => {
     if (err) {

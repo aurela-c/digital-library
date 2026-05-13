@@ -5,9 +5,6 @@ import {
   Counter,
 } from "prom-client";
 
-/**
- * Prometheus metrics per process (own Registry to avoid cross-test pollution).
- */
 export function createMetricsBundle(serviceName) {
   const register = new Registry();
   register.setDefaultLabels({ service: serviceName });

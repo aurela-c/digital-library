@@ -11,6 +11,11 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       proxy: {
+        "/api/auth": {
+          target: gateway,
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/api/, ""),
+        },
         "/auth": { target: gateway, changeOrigin: true },
         "/users": { target: gateway, changeOrigin: true },
         "/books": { target: gateway, changeOrigin: true },

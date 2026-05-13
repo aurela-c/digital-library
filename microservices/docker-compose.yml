@@ -24,6 +24,9 @@ services:
       dockerfile: user-service/Dockerfile
     ports:
       - "5002:5002"
+      - "5012:5012"
+    environment:
+      USER_GRPC_PORT: "5012"
     networks:
       - app_net
 
@@ -33,6 +36,9 @@ services:
       dockerfile: book-service/Dockerfile
     ports:
       - "5003:5003"
+      - "5013:5013"
+    environment:
+      BOOK_GRPC_PORT: "5013"
     networks:
       - app_net
 
@@ -42,6 +48,9 @@ services:
       dockerfile: borrow-service/Dockerfile
     ports:
       - "5004:5004"
+      - "5014:5014"
+    environment:
+      BORROW_GRPC_PORT: "5014"
     networks:
       - app_net
 
@@ -53,6 +62,9 @@ services:
       - "4000:4000"
     environment:
       AUTH_SERVICE_GRPC: auth-service:5010
+      USER_SERVICE_GRPC: user-service:5012
+      BOOK_SERVICE_GRPC: book-service:5013
+      BORROW_SERVICE_GRPC: borrow-service:5014
     networks:
       - app_net
 

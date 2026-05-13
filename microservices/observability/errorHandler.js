@@ -1,6 +1,3 @@
-/**
- * Standard JSON errors with correlation id (no stack leak in production).
- */
 export function createErrorHandler(logger) {
   return (err, req, res, next) => {
     if (res.headersSent) {

@@ -1,6 +1,3 @@
-/**
- * Structured access log after response completes (level INFO).
- */
 export function createRequestLogMiddleware(logger) {
   return (req, res, next) => {
     const start = process.hrtime.bigint();
