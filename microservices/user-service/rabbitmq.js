@@ -1,16 +1,19 @@
 import amqp from "amqplib";
+import { createLogger } from "../observability/logger.js";
+import { formatRabbitMqError } from "../observability/friendlyErrors.js";
 
 let channel;
+const log = createLogger("user-service");
 
 export const connectRabbitMQ = async () => {
   try {
     const connection = await amqp.connect("amqp://localhost");
     channel = await connection.createChannel();
 
-    console.log("User Service connected to RabbitMQ");
+    log.info("RabbitMQ connected");
     return channel;
   } catch (err) {
-    console.error("RabbitMQ connection error:", err.message || err);
+    log.warn(formatRabbitMqError(err));
     channel = undefined;
     return null;
   }

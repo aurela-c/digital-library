@@ -1,5 +1,7 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
+import { createLogger } from "../../observability/logger.js";
+import { formatGrpcBindError } from "../../observability/friendlyErrors.js";
 
 import {
   AddBook,
@@ -9,6 +11,8 @@ import {
   DeleteBook,
 } from "../controllers/bookController.js";
 import { resolveProtoPath } from "./resolveProtoPath.js";
+
+grpc.setLogVerbosity(grpc.logVerbosity.NONE);
 
 const PROTO_PATH = resolveProtoPath("book.proto");
 
@@ -28,17 +32,20 @@ server.addService(bookPackage.BookService.service, {
 });
 
 const grpcPort = Number(process.env.BOOK_GRPC_PORT || 5013);
+const log = createLogger("book-service");
 
 server.bindAsync(
   `0.0.0.0:${grpcPort}`,
   grpc.ServerCredentials.createInsecure(),
   (err, port) => {
     if (err) {
-      console.error("gRPC bind error:", err);
+      log.error(
+        { err: { message: err.message, code: err.code } },
+        formatGrpcBindError(grpcPort, err)
+      );
       return;
     }
 
-    console.log("Book gRPC running on", port);
-    console.log("gRPC server ready");
+    log.info(`gRPC listening on port ${port}`);
   }
 );

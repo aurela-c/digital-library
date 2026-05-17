@@ -1,5 +1,7 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
+import { createLogger } from "../../observability/logger.js";
+import { formatGrpcBindError } from "../../observability/friendlyErrors.js";
 
 import {
   GetAllUsers,
@@ -22,18 +24,20 @@ server.addService(userPackage.UserService.service, {
 });
 
 const grpcPort = Number(process.env.USER_GRPC_PORT || 5012);
+const log = createLogger("user-service");
 
 server.bindAsync(
   `0.0.0.0:${grpcPort}`,
   grpc.ServerCredentials.createInsecure(),
   (err, port) => {
     if (err) {
-      console.error("gRPC bind error:", err);
+      log.error(
+        { err: { message: err.message, code: err.code } },
+        formatGrpcBindError(grpcPort, err)
+      );
       return;
     }
 
-    server.start();
-    console.log("User gRPC running on", port);
-    console.log("gRPC server ready");
+    log.info(`gRPC listening on port ${port}`);
   }
 );

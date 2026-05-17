@@ -13,6 +13,7 @@ import {
   createHealthHandler,
   createErrorHandler,
   notFoundHandler,
+  summarizeErr,
 } from "../observability/index.js";
 
 const logger = createLogger("borrow-service");
@@ -55,21 +56,24 @@ app.use(createErrorHandler(logger));
 const start = async () => {
   try {
     await sequelize.authenticate();
-    logger.info("database connected");
+    logger.info("Database connected");
     await sequelize.sync();
-    logger.info("models synced");
+    logger.info("Models synced");
 
     await connectRabbitMQ();
 
     app.listen(5004, () => {
-      logger.info({ port: 5004 }, "borrow-service listening");
+      logger.info("HTTP listening on port 5004");
 
       setTimeout(() => {
         registerService("borrow-service", 5004);
       }, 1500);
     });
   } catch (err) {
-    logger.fatal({ err }, "borrow-service startup failed");
+    logger.fatal(
+      { err: summarizeErr(err, 8), msg: "startup_failed" },
+      `Startup failed: ${err?.message || err}`
+    );
     process.exit(1);
   }
 };

@@ -15,9 +15,11 @@ import {
   createHealthHandler,
   createErrorHandler,
   notFoundHandler,
+  summarizeErr,
+  formatGrpcBindError,
 } from "../observability/index.js";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const logger = createLogger("auth-service");
 registerProcessHandlers(logger);
@@ -32,10 +34,6 @@ app.use(createRequestLogMiddleware(logger));
 
 app.use(express.json());
 
-app.use((req, res, next) => {
-  console.log(req.method, req.url);
-  next();
-});
 app.use("/auth", authRoutes);
 
 app.get(
@@ -74,15 +72,15 @@ app.use(createErrorHandler(logger));
 const start = async () => {
   try {
     await sequelize.authenticate();
-    logger.info("database connection established");
+    logger.info("Database connected");
     await sequelize.sync();
-    logger.info("sequelize models synced");
+    logger.info("Models synced");
 
     const { startAuthGrpcServer } = await import("./grpc/authServer.js");
     await startAuthGrpcServer(logger);
 
     app.listen(5001, () => {
-      logger.info({ port: 5001 }, "auth-service listening");
+      logger.info("HTTP listening on port 5001");
       printExpressStack(app, "auth-service");
 
       setTimeout(() => {
@@ -90,7 +88,22 @@ const start = async () => {
       }, 1500);
     });
   } catch (err) {
-    logger.fatal({ err }, "auth-service startup failed");
+    const grpcPort = Number(process.env.AUTH_GRPC_PORT || 5010);
+    const msg = String(err?.message || err);
+    const grpcBind =
+      /No address added|EADDRINUSE|listen EADDRINUSE|already in use/i.test(
+        msg
+      );
+    const human = grpcBind
+      ? formatGrpcBindError(grpcPort, err)
+      : msg.split("\n")[0];
+    logger.fatal(
+      {
+        err: summarizeErr(err, grpcBind ? 0 : 6),
+        msg: "startup_failed",
+      },
+      `Startup failed: ${human}`
+    );
     process.exit(1);
   }
 };

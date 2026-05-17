@@ -1,7 +1,7 @@
 import { Sequelize } from "sequelize";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const database = process.env.DB_NAME || process.env.MYSQL_DATABASE || "digital-library";
 const username = process.env.DB_USER || process.env.MYSQL_USER || "root";

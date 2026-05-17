@@ -14,6 +14,7 @@ import {
   createHealthHandler,
   createErrorHandler,
   notFoundHandler,
+  summarizeErr,
 } from "../observability/index.js";
 
 const logger = createLogger("user-service");
@@ -56,9 +57,9 @@ app.use(createErrorHandler(logger));
 const start = async () => {
   try {
     await sequelize.authenticate();
-    logger.info("database connected");
+    logger.info("Database connected");
     await sequelize.sync();
-    logger.info("models synced");
+    logger.info("Models synced");
 
     const mq = await connectRabbitMQ();
     if (mq) {
@@ -68,14 +69,17 @@ const start = async () => {
     }
 
     app.listen(5002, () => {
-      logger.info({ port: 5002 }, "user-service listening");
+      logger.info("HTTP listening on port 5002");
 
       setTimeout(() => {
         registerService("user-service", 5002);
       }, 1500);
     });
   } catch (err) {
-    logger.fatal({ err }, "user-service startup failed");
+    logger.fatal(
+      { err: summarizeErr(err, 8), msg: "startup_failed" },
+      `Startup failed: ${err?.message || err}`
+    );
     process.exit(1);
   }
 };

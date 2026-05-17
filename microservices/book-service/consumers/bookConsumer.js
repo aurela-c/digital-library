@@ -1,9 +1,12 @@
 import { getChannel } from "../rabbitmq.js";
+import { createLogger } from "../../observability/logger.js";
+
+const log = createLogger("book-service");
 
 export const startBookConsumer = () => {
   const channel = getChannel();
   if (!channel) {
-    console.warn("startBookConsumer: no RabbitMQ channel");
+    log.warn("Event consumers skipped (no RabbitMQ channel)");
     return;
   }
 

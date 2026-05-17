@@ -37,8 +37,8 @@ app.use(createRequestLogMiddleware(logger));
 
 redis
   .ping()
-  .then((r) => logger.info({ redis: r }, "redis ping"))
-  .catch((e) => logger.warn({ err: e.message }, "redis unavailable"));
+  .then((r) => logger.info(`Redis: ${r}`))
+  .catch((e) => logger.warn(`Redis unavailable - ${e.message}`));
 
 const parseCorsOrigins = () => {
   const raw = process.env.CORS_ORIGIN;
@@ -231,5 +231,5 @@ app.use(createErrorHandler(logger));
 const port = Number(process.env.PORT) || 4000;
 printExpressStack(app, "api-gateway");
 app.listen(port, () => {
-  logger.info({ port }, "api-gateway listening");
+  logger.info(`HTTP listening on port ${port}`);
 });

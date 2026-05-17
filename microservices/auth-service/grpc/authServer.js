@@ -1,5 +1,6 @@
 import grpc from "@grpc/grpc-js";
 import protoLoader from "@grpc/proto-loader";
+import { formatGrpcBindError } from "../../observability/friendlyErrors.js";
 import { resolveProtoPath } from "./resolveProtoPath.js";
 import {
   Register,
@@ -7,6 +8,9 @@ import {
   RefreshToken,
   ValidateAccessToken,
 } from "../controllers/authGrpcController.js";
+
+// Avoid duplicate stderr from @grpc/grpc-js; we log bind failures ourselves.
+grpc.setLogVerbosity(grpc.logVerbosity.NONE);
 
 const PROTO_PATH = resolveProtoPath("auth.proto");
 
@@ -39,14 +43,13 @@ export function startAuthGrpcServer(logger) {
       grpc.ServerCredentials.createInsecure(),
       (err, boundPort) => {
         if (err) {
-          logger.error({ err }, "auth gRPC bind failed");
+          logger.error(
+            { err: { message: err.message, code: err.code } },
+            formatGrpcBindError(port, err)
+          );
           return reject(err);
         }
-        server.start();
-        logger.info(
-          { grpcPort: boundPort, transport: "grpc" },
-          "auth-service gRPC listening"
-        );
+        logger.info(`gRPC listening on port ${boundPort}`);
         resolve(boundPort);
       }
     );

@@ -9,11 +9,12 @@ export function createRequestLogMiddleware(logger) {
         req.user?.userId ??
         (req.user?.sub != null ? String(req.user.sub) : null);
 
+      const endpoint = req.originalUrl?.split("?")[0];
       logger.info({
         msg: "http_access",
         correlationId: req.correlationId,
         method: req.method,
-        endpoint: req.originalUrl?.split("?")[0],
+        endpoint,
         statusCode: res.statusCode,
         durationMs,
         userId: userId || undefined,
