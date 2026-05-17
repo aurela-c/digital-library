@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 
-const ACCESS_SECRET = process.env.ACCESS_SECRET || "ACCESS_SECRET_KEY";
+import { getSecret } from "../../observability/config/secrets.js";
+
+const ACCESS_SECRET = getSecret("ACCESS_SECRET", "ACCESS_SECRET_KEY");
 
 export const authMiddleware = (req, res, next) => {
   const header = req.headers.authorization;

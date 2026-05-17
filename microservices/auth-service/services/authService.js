@@ -5,11 +5,12 @@ import { userRepository } from "../repositories/userRepository.js";
 import { refreshTokenRepository } from "../repositories/refreshTokenRepository.js";
 import { sendEmail } from "../utils/emailService.js";
 import { auditLog } from "../utils/auditLog.js";
+import { getSecret } from "../../observability/config/secrets.js";
 
 const isProd = process.env.NODE_ENV === "production";
 
-const ACCESS_SECRET = process.env.ACCESS_SECRET || "ACCESS_SECRET_KEY";
-const REFRESH_SECRET = process.env.REFRESH_SECRET || "REFRESH_SECRET_KEY";
+const ACCESS_SECRET = getSecret("ACCESS_SECRET", "ACCESS_SECRET_KEY");
+const REFRESH_SECRET = getSecret("REFRESH_SECRET", "REFRESH_SECRET_KEY");
 
 const ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || "1h";
 const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";

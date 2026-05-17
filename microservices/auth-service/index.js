@@ -79,12 +79,13 @@ const start = async () => {
     const { startAuthGrpcServer } = await import("./grpc/authServer.js");
     await startAuthGrpcServer(logger);
 
-    app.listen(5001, () => {
-      logger.info("HTTP listening on port 5001");
+    const httpPort = Number(process.env.PORT) || 5001;
+    app.listen(httpPort, () => {
+      logger.info(`HTTP listening on port ${httpPort}`);
       printExpressStack(app, "auth-service");
 
       setTimeout(() => {
-        registerService("auth-service", 5001);
+        registerService("auth-service", httpPort);
       }, 1500);
     });
   } catch (err) {

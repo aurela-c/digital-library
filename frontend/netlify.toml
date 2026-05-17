@@ -1,0 +1,16 @@
+# Netlify build configuration for the Digital Library React SPA
+# Docs: https://docs.netlify.com/configure-builds/file-based-configuration/
+
+[build]
+  base = "frontend"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback — React Router client-side routes
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

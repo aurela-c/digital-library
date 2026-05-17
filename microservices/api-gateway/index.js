@@ -58,10 +58,18 @@ app.use(
       if (allowed.includes(origin)) {
         return callback(null, true);
       }
-      if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
-        return callback(null, true);
+      if (process.env.NODE_ENV !== "production") {
+        if (/^http:\/\/127\.0\.0\.1:\d+$/.test(origin)) {
+          return callback(null, true);
+        }
+        if (/^http:\/\/localhost:\d+$/.test(origin)) {
+          return callback(null, true);
+        }
       }
-      if (/^http:\/\/localhost:\d+$/.test(origin)) {
+      if (
+        process.env.NODE_ENV === "production" &&
+        /^https:\/\/[\w.-]+\.(netlify\.app|pages\.dev)$/.test(origin)
+      ) {
         return callback(null, true);
       }
       return callback(null, false);

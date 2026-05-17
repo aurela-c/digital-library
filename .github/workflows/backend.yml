@@ -1,0 +1,114 @@
+name: Backend CI / Railway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "microservices/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "microservices/**"
+      - ".github/workflows/backend.yml"
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: observability
+            path: microservices/observability
+            check: index.js
+          - name: api-gateway
+            path: microservices/api-gateway
+            check: index.js
+          - name: auth-service
+            path: microservices/auth-service
+            check: index.js
+          - name: user-service
+            path: microservices/user-service
+            check: index.js
+          - name: book-service
+            path: microservices/book-service
+            check: index.js
+          - name: borrow-service
+            path: microservices/borrow-service
+            check: index.js
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install ${{ matrix.name }}
+        working-directory: ${{ matrix.path }}
+        run: npm ci
+
+      - name: Syntax check ${{ matrix.name }}
+        run: node --check ${{ matrix.path }}/${{ matrix.check }}
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: validate
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install test dependencies
+        working-directory: microservices/tests
+        run: npm ci
+
+      - name: Run integration tests (requires running stack)
+        working-directory: microservices/tests
+        env:
+          INTEGRATION_GATEWAY_URL: ${{ secrets.INTEGRATION_GATEWAY_URL }}
+          ACCESS_SECRET: ${{ secrets.ACCESS_SECRET }}
+        run: |
+          if [ -z "$INTEGRATION_GATEWAY_URL" ]; then
+            echo "Skipping integration tests — set INTEGRATION_GATEWAY_URL secret to run against a deployed gateway."
+            exit 0
+          fi
+          npm test
+
+  deploy-railway:
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Trigger Railway redeploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "RAILWAY_TOKEN not set — rely on Railway GitHub integration for deploy, or add the secret."
+            exit 0
+          fi
+          railway redeploy --yes

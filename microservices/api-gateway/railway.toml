@@ -1,0 +1,11 @@
+# Railway service: api-gateway
+# Set Root Directory in Railway UI to: microservices
+# Dockerfile path is relative to that root.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "api-gateway/Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"

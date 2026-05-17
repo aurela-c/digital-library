@@ -1,8 +1,5 @@
-import Redis from "ioredis";
+import { createRedisClient } from "../observability/config/redis.js";
 
-const redis = new Redis({
-  host: "127.0.0.1",
-  port: 6379,
-});
+const redis = createRedisClient();
 
 export default redis;

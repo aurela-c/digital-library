@@ -68,11 +68,12 @@ const start = async () => {
       logger.warn("RabbitMQ unavailable — event consumers not started");
     }
 
-    app.listen(5003, () => {
-      logger.info("HTTP listening on port 5003");
+    const httpPort = Number(process.env.PORT) || 5003;
+    app.listen(httpPort, () => {
+      logger.info(`HTTP listening on port ${httpPort}`);
 
       setTimeout(() => {
-        registerService("book-service", 5003);
+        registerService("book-service", httpPort);
       }, 1500);
     });
   } catch (err) {

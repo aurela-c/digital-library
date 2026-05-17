@@ -1,9 +1,8 @@
-import { Sequelize } from "sequelize";
+import dotenv from "dotenv";
+import { createSequelize } from "../../observability/config/database.js";
 
-const sequelize = new Sequelize("digital-library", "root", "", {
-  host: "localhost",
-  dialect: "mysql",
-  logging: false,
-});
+dotenv.config({ quiet: true });
+
+const sequelize = createSequelize();
 
 export default sequelize;

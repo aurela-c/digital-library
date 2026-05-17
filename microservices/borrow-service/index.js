@@ -62,11 +62,12 @@ const start = async () => {
 
     await connectRabbitMQ();
 
-    app.listen(5004, () => {
-      logger.info("HTTP listening on port 5004");
+    const httpPort = Number(process.env.PORT) || 5004;
+    app.listen(httpPort, () => {
+      logger.info(`HTTP listening on port ${httpPort}`);
 
       setTimeout(() => {
-        registerService("borrow-service", 5004);
+        registerService("borrow-service", httpPort);
       }, 1500);
     });
   } catch (err) {

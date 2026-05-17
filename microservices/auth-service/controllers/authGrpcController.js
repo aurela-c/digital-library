@@ -1,5 +1,9 @@
 import * as grpc from "@grpc/grpc-js";
+import jwt from "jsonwebtoken";
 import { authService } from "../services/authService.js";
+import { getSecret } from "../../observability/config/secrets.js";
+
+const ACCESS_SECRET = getSecret("ACCESS_SECRET", "ACCESS_SECRET_KEY");
 
 const toUserProfile = (u) =>
   u
@@ -94,8 +98,6 @@ export const RefreshToken = async (call, callback) => {
 
 export const ValidateAccessToken = async (call, callback) => {
   try {
-    const jwt = (await import("jsonwebtoken")).default;
-    const ACCESS_SECRET = process.env.ACCESS_SECRET || "ACCESS_SECRET_KEY";
     const token = call.request.accessToken;
     if (!token) {
       return callback(null, {
