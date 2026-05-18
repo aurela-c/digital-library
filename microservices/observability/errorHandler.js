@@ -21,7 +21,7 @@ export function createErrorHandler(logger) {
 
     logger.error(
       {
-        msg: "http_error",
+        event: "http_error",
         correlationId: req.correlationId,
         err: errPayload,
         method: req.method,

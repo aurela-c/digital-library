@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import sequelize from "./config/database.js";
 import dotenv from "dotenv";
 import { registerService } from "./src/registerService.js";
@@ -25,6 +26,13 @@ registerProcessHandlers(logger);
 const metrics = createMetricsBundle("auth-service");
 
 const app = express();
+
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 
 app.use(correlationIdMiddleware);
 app.use(metrics.middleware);
@@ -77,6 +85,7 @@ const start = async () => {
     await startAuthGrpcServer(logger);
 
     const httpPort = Number(process.env.PORT) || 5001;
+
     app.listen(httpPort, () => {
       logger.info(`HTTP listening on port ${httpPort}`);
       printExpressStack(app, "auth-service");
@@ -88,20 +97,19 @@ const start = async () => {
   } catch (err) {
     const grpcPort = Number(process.env.AUTH_GRPC_PORT || 5010);
     const msg = String(err?.message || err);
+
     const grpcBind =
-      /No address added|EADDRINUSE|listen EADDRINUSE|already in use/i.test(
-        msg
-      );
+      /No address added|EADDRINUSE|listen EADDRINUSE|already in use/i.test(msg);
+
     const human = grpcBind
       ? formatGrpcBindError(grpcPort, err)
       : msg.split("\n")[0];
+
     logger.fatal(
-      {
-        err: summarizeErr(err, grpcBind ? 0 : 6),
-        msg: "startup_failed",
-      },
+      { err: summarizeErr(err, grpcBind ? 0 : 6), event: "startup_failed" },
       `Startup failed: ${human}`
     );
+
     process.exit(1);
   }
 };

@@ -2,7 +2,7 @@ import { Sequelize } from "sequelize";
 
 /**
  * Single MySQL connection entry point for all microservices.
- * Requires MYSQL_URL (e.g. mysql://user:pass@127.0.0.1:3306/digital_library).
+ * Requires MYSQL_URL (e.g. mysql://user:pass@127.0.0.1:3306/digital-library).
  */
 export function createSequelize() {
   const mysqlUrl = process.env.MYSQL_URL;

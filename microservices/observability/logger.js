@@ -1,12 +1,15 @@
 import pino from "pino";
 import { Writable } from "node:stream";
 
-/** Production / log aggregators: JSON lines. Dev default: human-readable ANSI. */
+/**
+ * JSON logs for production / aggregators when LOG_FORMAT=json or NODE_ENV=production.
+ * Pretty terminal logs by default in development (LOG_FORMAT=pretty forces pretty anywhere).
+ */
 export function useJsonLogs() {
-  return (
-    process.env.LOG_FORMAT === "json" ||
-    String(process.env.NODE_ENV || "").toLowerCase() === "production"
-  );
+  const fmt = String(process.env.LOG_FORMAT || "").toLowerCase();
+  if (fmt === "json") return true;
+  if (fmt === "pretty" || fmt === "dev" || fmt === "human") return false;
+  return String(process.env.NODE_ENV || "").toLowerCase() === "production";
 }
 
 const C = {
@@ -17,7 +20,6 @@ const C = {
   yellow: "\x1b[33m",
   cyan: "\x1b[36m",
   gray: "\x1b[90m",
-  bold: "\x1b[1m",
 };
 
 function levelColor(level) {
@@ -54,6 +56,38 @@ function formatInlineErr(err) {
   return `${msg}${code}`.trim() || "error";
 }
 
+function resolveLogMessage(o) {
+  const event = o.event;
+
+  if (event === "http_access") {
+    return `${o.method || "?"} ${o.endpoint || o.url || "?"} → ${o.statusCode ?? "?"} ${o.durationMs ?? "?"}ms`;
+  }
+
+  if (event === "http_error") {
+    const base = o.message || "request failed";
+    const where = o.method && o.endpoint ? ` (${o.method} ${o.endpoint})` : "";
+    return `${base}${where}`;
+  }
+
+  if (event === "audit" || event === "gateway_audit") {
+    const action = o.action || o.msg || "audit";
+    return typeof action === "string" ? action : "audit_event";
+  }
+
+  if (typeof o.message === "string" && o.message) return o.message;
+
+  let msg = o.msg;
+  if (msg == null) return "";
+
+  if (typeof msg === "string") {
+    const internal = /^(startup_failed|uncaughtException|unhandledRejection|http_access|http_error|audit)$/;
+    if (internal.test(msg) && typeof o.message === "string") return o.message;
+    return msg;
+  }
+
+  return String(msg);
+}
+
 class DevPrettyStream extends Writable {
   _write(chunk, _enc, cb) {
     try {
@@ -62,37 +96,24 @@ class DevPrettyStream extends Writable {
         const trimmed = line.trim();
         if (!trimmed) continue;
         const o = JSON.parse(trimmed);
-        const svc = String(o.service || o.name || "app").toUpperCase();
         const lvl = o.level ?? 30;
         const lc = levelColor(lvl);
         const ln = levelName(lvl);
-        let msg = o.msg;
+        const text = resolveLogMessage(o);
 
-        if (o.msg === "http_access") {
-          msg = `${o.method} ${o.endpoint} → ${o.statusCode} ${o.durationMs}ms`;
-        }
-
-        if (msg == null && o.message) msg = o.message;
-        if (msg == null) msg = "";
-
-        let extra = "";
-        if (o.port != null && /listening/i.test(String(msg))) {
-          extra = "";
-        } else if (o.grpcPort != null && !String(msg).includes("port")) {
-          extra = ` (gRPC ${o.grpcPort})`;
-        } else if (o.redis != null && String(msg).includes("redis")) {
-          extra = ` (${o.redis})`;
-        }
-
-        let out = `${lc}[${ln}]${C.reset}${C.cyan}[${svc}]${C.reset} ${msg}${extra}`;
+        let out = `${lc}[${ln}]${C.reset} ${text}`;
 
         const err = o.err;
-        if (err && typeof err === "object" && (lvl >= 50 || o.msg === "http_error")) {
-          out += `\n${C.gray}  ${formatInlineErr(err)}${C.reset}`;
+        if (err && typeof err === "object" && lvl >= 50) {
+          const detail = formatInlineErr(err);
+          if (detail && !text.includes(detail)) {
+            out += `\n${C.gray}  → ${detail}${C.reset}`;
+          }
           if (err.stack && lvl >= 50) {
             out += `\n${C.dim}${shortStack(err.stack)}${C.reset}`;
           }
         }
+
         console.log(out);
       }
     } catch {

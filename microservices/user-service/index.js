@@ -78,7 +78,7 @@ const start = async () => {
     });
   } catch (err) {
     logger.fatal(
-      { err: summarizeErr(err, 8), msg: "startup_failed" },
+      { err: summarizeErr(err, 8), event: "startup_failed" },
       `Startup failed: ${err?.message || err}`
     );
     process.exit(1);

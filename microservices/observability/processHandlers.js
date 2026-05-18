@@ -6,7 +6,7 @@ export function registerProcessHandlers(logger) {
     const detail = useJsonLogs()
       ? { message: err.message, stack: err.stack }
       : summarizeErr(err, 6);
-    logger.fatal({ err: detail, msg: "uncaughtException" }, err.message);
+    logger.fatal({ err: detail, event: "uncaughtException" }, err.message);
     process.exit(1);
   });
 
@@ -17,6 +17,6 @@ export function registerProcessHandlers(logger) {
           ? { message: reason.message, stack: reason.stack }
           : summarizeErr(reason, 6)
         : { reason: String(reason) };
-    logger.error({ msg: "unhandledRejection", err: detail }, "unhandledRejection");
+    logger.error({ err: detail, event: "unhandledRejection" }, "Unhandled promise rejection");
   });
 }

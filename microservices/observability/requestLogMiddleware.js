@@ -11,7 +11,7 @@ export function createRequestLogMiddleware(logger) {
 
       const endpoint = req.originalUrl?.split("?")[0];
       logger.info({
-        msg: "http_access",
+        event: "http_access",
         correlationId: req.correlationId,
         method: req.method,
         endpoint,

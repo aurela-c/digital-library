@@ -50,7 +50,7 @@ export const auditLog = (action) => {
     const userId = req.user?.id ?? req.user?.userId ?? "anonymous";
     gatewayLog.info(
       {
-        msg: "gateway_audit",
+        event: "gateway_audit",
         action,
         userId,
         correlationId: req.correlationId,
