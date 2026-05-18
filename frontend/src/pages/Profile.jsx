@@ -14,7 +14,7 @@ const Profile = () => {
   const userId = localStorage.getItem("userId");
 
   const storageKey = `profileImage_${userId}`;
-  const [profileImage] = useState(
+  const [profileImage, setProfileImage] = useState(
     localStorage.getItem(storageKey) || null
   );
 
@@ -23,6 +23,11 @@ const Profile = () => {
       try {
         const res = await API.get(`/auth/${userId}`);
         setUser(res.data);
+        const fromApi = res.data?.profileImage;
+        if (fromApi) {
+          setProfileImage(fromApi);
+          localStorage.setItem(storageKey, fromApi);
+        }
       } catch (err) {
         console.error("USER ERROR:", err);
       }

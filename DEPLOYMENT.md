@@ -7,7 +7,7 @@ Deploy the **React (Vite) frontend** on **Netlify**, the **Node.js microservices
 | Frontend SPA | Netlify | `https://the-boook-club.netlify.app` |
 | API Gateway | Railway | `https://<api-gateway>.up.railway.app` |
 | Microservices | Railway (private + HTTP health) | Internal / per-service URLs |
-| MySQL | Railway MySQL | `DATABASE_URL` (private) |
+| MySQL | Railway MySQL | `MYSQL_URL` (private) |
 | Redis | Railway Redis | `REDIS_URL` (private) |
 | RabbitMQ | CloudAMQP / Railway plugin | `RABBITMQ_URL` (private) |
 
@@ -126,7 +126,7 @@ Copy from `microservices/.env.example` and `microservices/<service>/.env.example
 
 ```env
 NODE_ENV=production
-DATABASE_URL=${{MySQL.DATABASE_URL}}
+MYSQL_URL=${{MySQL.MYSQL_URL}}
 ACCESS_SECRET=<shared-secret>
 REFRESH_SECRET=<shared-secret>
 AUTH_GRPC_PORT=5010
@@ -137,7 +137,7 @@ CONSUL_ENABLED=false
 
 ```env
 NODE_ENV=production
-DATABASE_URL=${{MySQL.DATABASE_URL}}
+MYSQL_URL=${{MySQL.MYSQL_URL}}
 RABBITMQ_URL=<amqp-url>
 USER_GRPC_PORT=5012   # adjust per service
 CONSUL_ENABLED=false
@@ -268,7 +268,7 @@ On push to **`main`** (optional):
 - [ ] `NODE_ENV=production` on all Railway services.
 - [ ] `CORS_ORIGIN` lists only your Netlify URL(s).
 - [ ] Frontend uses only `VITE_GATEWAY_TARGET` (no API keys in the bundle).
-- [ ] MySQL/Redis/RabbitMQ use private URLs, not exposed to the browser.
+- [ ] `MYSQL_URL` and Redis/RabbitMQ URLs are private, not exposed to the browser.
 - [ ] Consul disabled in production (`CONSUL_ENABLED=false`).
 
 ---
@@ -299,7 +299,7 @@ VITE_GATEWAY_TARGET=https://<api-gateway>.up.railway.app
 ```env
 NODE_ENV=production
 PORT=<injected-by-railway>
-DATABASE_URL=mysql://...
+MYSQL_URL=mysql://...
 ACCESS_SECRET=...
 REFRESH_SECRET=...
 REDIS_URL=redis://...

@@ -9,56 +9,52 @@ const User = sequelize.define(
       autoIncrement: true,
       primaryKey: true,
     },
-
     username: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-
     email: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
     },
-
     password: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-
     role: {
       type: DataTypes.STRING,
       defaultValue: "ROLE_USER",
     },
-
     isVerified: {
       type: DataTypes.BOOLEAN,
+      field: "is_verified",
       defaultValue: false,
     },
-
     verificationToken: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: "verification_token",
     },
-
     resetPasswordToken: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: "reset_password_token",
     },
-
     resetPasswordExpires: {
       type: DataTypes.DATE,
       allowNull: true,
+      field: "reset_password_expires",
     },
-
     profileImage: {
       type: DataTypes.STRING,
       allowNull: true,
+      field: "profile_image",
     },
-
     accountStatus: {
       type: DataTypes.STRING(16),
       allowNull: false,
+      field: "account_status",
       defaultValue: "ACTIVE",
       validate: {
         isIn: [["ACTIVE", "INACTIVE", "BANNED"]],
@@ -66,11 +62,10 @@ const User = sequelize.define(
     },
   },
   {
-    // Dedicated table: user-service also uses MySQL "users" with a smaller
-    // schema; sharing one table causes missing-column / sync conflicts and
-    // breaks auth register/login.
-    tableName: "auth_users",
+    tableName: "users",
     timestamps: true,
+    createdAt: "created_at",
+    updatedAt: false,
   }
 );
 

@@ -4,7 +4,6 @@ import dotenv from "dotenv";
 import { registerService } from "./src/registerService.js";
 import authRoutes from "./routes/authRoutes.js";
 import { printExpressStack } from "./utils/printRoutes.js";
-import "./models/associations.js";
 import { verifyEmailTransport } from "./utils/emailService.js";
 import {
   createLogger,
@@ -72,9 +71,7 @@ app.use(createErrorHandler(logger));
 const start = async () => {
   try {
     await sequelize.authenticate();
-    logger.info("Database connected");
-    await sequelize.sync();
-    logger.info("Models synced");
+    logger.info("Database connected (users table — no ORM sync)");
 
     const { startAuthGrpcServer } = await import("./grpc/authServer.js");
     await startAuthGrpcServer(logger);

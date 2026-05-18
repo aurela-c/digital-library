@@ -2,7 +2,6 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { userRepository } from "../repositories/userRepository.js";
-import { refreshTokenRepository } from "../repositories/refreshTokenRepository.js";
 import { sendEmail } from "../utils/emailService.js";
 import { auditLog } from "../utils/auditLog.js";
 import { getSecret } from "../../observability/config/secrets.js";
@@ -37,25 +36,10 @@ const accessPayload = (user) => ({
 const signAccessToken = (user) =>
   jwt.sign(accessPayload(user), ACCESS_SECRET, { expiresIn: ACCESS_EXPIRES_IN });
 
-const refreshTtlMs = () => {
-  const match = /^(\d+)([dhms])$/i.exec(String(REFRESH_EXPIRES_IN).trim());
-  if (!match) return 7 * 24 * 60 * 60 * 1000;
-  const n = Number(match[1]);
-  const u = match[2].toLowerCase();
-  const mult =
-    u === "d" ? 86400000 : u === "h" ? 3600000 : u === "m" ? 60000 : 1000;
-  return n * mult;
-};
-
-const issueRefreshToken = async (user) => {
+/** Stateless refresh JWT (no separate refresh-token table). */
+const issueRefreshToken = (user) => {
   const jti = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + refreshTtlMs());
-  await refreshTokenRepository.create({
-    userId: user.id,
-    jti,
-    expiresAt,
-  });
-  const refreshToken = jwt.sign(
+  return jwt.sign(
     {
       sub: String(user.id),
       userId: user.id,
@@ -65,7 +49,6 @@ const issueRefreshToken = async (user) => {
     REFRESH_SECRET,
     { expiresIn: REFRESH_EXPIRES_IN }
   );
-  return refreshToken;
 };
 
 const publicUser = (user) => ({
@@ -175,10 +158,8 @@ export const authService = {
       throw err;
     }
 
-    await refreshTokenRepository.revokeAllActiveForUser(user.id);
-
     const accessToken = signAccessToken(user);
-    const refreshToken = await issueRefreshToken(user);
+    const refreshToken = issueRefreshToken(user);
 
     auditLog({ action: "LOGIN_OK", userId: user.id, email: user.email });
 
@@ -203,29 +184,22 @@ export const authService = {
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, REFRESH_SECRET);
-    } catch (e) {
+    } catch {
       const err = new Error("Invalid refresh token");
       err.status = 403;
       err.code = "REFRESH_INVALID";
       throw err;
     }
 
-    if (decoded.typ !== "refresh" || !decoded.jti) {
+    if (decoded.typ !== "refresh") {
       const err = new Error("Invalid refresh token");
       err.status = 403;
       err.code = "REFRESH_INVALID";
       throw err;
     }
 
-    const row = await refreshTokenRepository.findValidByJti(decoded.jti);
-    if (!row || String(row.userId) !== String(decoded.sub)) {
-      const err = new Error("Invalid refresh token");
-      err.status = 403;
-      err.code = "REFRESH_INVALID";
-      throw err;
-    }
-
-    const user = await userRepository.findByPk(row.userId);
+    const userId = decoded.sub ?? decoded.userId;
+    const user = await userRepository.findByPk(userId);
     if (!user) {
       const err = new Error("Invalid refresh token");
       err.status = 403;
@@ -233,10 +207,8 @@ export const authService = {
       throw err;
     }
 
-    await refreshTokenRepository.revokeByJti(decoded.jti);
-
     const accessToken = signAccessToken(user);
-    const newRefresh = await issueRefreshToken(user);
+    const newRefresh = issueRefreshToken(user);
 
     auditLog({ action: "TOKEN_REFRESH", userId: user.id });
 
@@ -246,20 +218,7 @@ export const authService = {
     };
   },
 
-  async logout(body = {}) {
-    const refreshToken = body.refreshToken ?? body.token;
-    if (!refreshToken) {
-      return { status: 204, body: null };
-    }
-    try {
-      const decoded = jwt.verify(refreshToken, REFRESH_SECRET);
-      if (decoded.jti) {
-        await refreshTokenRepository.revokeByJti(decoded.jti);
-        auditLog({ action: "LOGOUT", userId: decoded.sub });
-      }
-    } catch {
-      /* ignore invalid token on logout */
-    }
+  async logout() {
     return { status: 204, body: null };
   },
 
@@ -347,8 +306,6 @@ export const authService = {
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
     await user.save();
-
-    await refreshTokenRepository.revokeAllActiveForUser(user.id);
 
     auditLog({ action: "PASSWORD_RESET_COMPLETE", userId: user.id });
     return { status: 200, body: { message: "Password reset successful" } };
