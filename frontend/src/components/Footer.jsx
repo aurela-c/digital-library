@@ -38,11 +38,11 @@ const Footer = () => {
               <p className="font-semibold mb-2">Follow us</p>
 
               <div className="flex gap-4 text-[#D34F4E] text-2xl justify-center md:justify-start">
-                <a href="#" className="hover:scale-110 transition p-1" aria-label="Facebook">
+                <a href="" className="hover:scale-110 transition p-1" aria-label="Facebook">
                   <i className="fab fa-facebook"></i>
                 </a>
 
-                <a href="#" className="hover:scale-110 transition p-1" aria-label="Instagram">
+                <a href="" className="hover:scale-110 transition p-1" aria-label="Instagram">
                   <i className="fab fa-instagram"></i>
                 </a>
               </div>

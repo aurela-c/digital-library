@@ -4,9 +4,7 @@ import axios from "axios";
 import redis from "./redisClient.js";
 import { securityStack } from "./security/securityStack.js";
 import { resolveHttpServiceUrl } from "./config/serviceUrls.js";
-import userRoutes from "./routes/userRoutes.js";
-import bookRoutes from "./routes/bookRoutes.js";
-import borrowRoutes from "./routes/borrowRoutes.js";
+import { createServiceHttpProxy } from "./utils/serviceHttpProxy.js";
 import { printExpressStack } from "./utils/printRoutes.js";
 import authClient from "./grpc-clients/authClient.js";
 import { promisify } from "util";
@@ -173,9 +171,18 @@ const authHttpProxy = async (req, res) => {
 app.use("/auth", authHttpProxy);
 app.use("/api/auth", authHttpProxy);
 
-app.use("/users", userRoutes);
-app.use("/books", bookRoutes);
-app.use("/borrow", borrowRoutes);
+app.use(
+  "/users",
+  createServiceHttpProxy("/users", "USER_SERVICE_URL", "user-service", 5002)
+);
+app.use(
+  "/books",
+  createServiceHttpProxy("/books", "BOOK_SERVICE_URL", "book-service", 5003)
+);
+app.use(
+  "/borrow",
+  createServiceHttpProxy("/borrow", "BORROW_SERVICE_URL", "borrow-service", 5004)
+);
 
 app.get(
   "/health",
@@ -230,7 +237,7 @@ app.get(
 );
 
 app.get("/", (req, res) => {
-  res.send("Gateway (Consul + gRPC + Microservices) ");
+  res.send("Gateway (routing only — JWT verified in microservices)");
 });
 
 app.use(notFoundHandler);

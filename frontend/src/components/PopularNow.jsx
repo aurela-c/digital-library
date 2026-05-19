@@ -44,8 +44,10 @@ function PopularNow() {
           Popular Now
         </h2>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
-          {featuredBooks.map((book) => (
+        {/* ONLY CHANGE: max 5 columns */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
+
+          {featuredBooks.slice(0, 5).map((book) => (
             <div key={book.id} className={bookTileCard}>
               <Link to={`/book/${book.id}`} className="block min-w-0">
                 <img
@@ -68,6 +70,7 @@ function PopularNow() {
               </button>
             </div>
           ))}
+
         </div>
       </PageContainer>
     </section>

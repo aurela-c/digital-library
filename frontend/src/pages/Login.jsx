@@ -22,27 +22,35 @@ const Login = () => {
 
       const { accessToken, refreshToken, user } = res.data;
 
+            //  SAVE TOKENS 
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("refreshToken", refreshToken);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // CONTEXT UPDATE
       loginUser(accessToken, refreshToken, user);
 
+      // DECODE ROLE
       const decoded = jwtDecode(accessToken);
 
       toast.success("Login successful!");
 
+      // ROUTING
       if (decoded.role === "ROLE_ADMIN") {
         navigate("/admin");
       } else {
         navigate("/home");
       }
+
     } catch (err) {
       console.error(err);
 
       const data = err.response?.data;
+
       const msg =
         typeof data?.error === "string"
           ? data.error
-          : data?.error != null
-            ? JSON.stringify(data.error)
-            : err.message || "Login failed";
+          : data?.message || err.message || "Login failed";
 
       toast.error(msg);
     } finally {

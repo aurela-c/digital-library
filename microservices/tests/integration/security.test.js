@@ -59,7 +59,7 @@ describe("Security (gateway)", () => {
     expect(res.data?.code).toBe("TOKEN_EXPIRED");
   });
 
-  test("wrong-signature JWT → 403 TOKEN_INVALID", async () => {
+  test("wrong-signature JWT → 401 TOKEN_INVALID", async () => {
     if (skip) return;
     const token = jwt.sign(
       { sub: "1", id: 1, role: "ROLE_USER", typ: "access" },
@@ -69,7 +69,8 @@ describe("Security (gateway)", () => {
     const res = await client.get("/books", {
       headers: { Authorization: `Bearer ${token}` },
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
+    expect(res.data?.code).toBe("TOKEN_INVALID");
   });
 
   test(

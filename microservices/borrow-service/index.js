@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import sequelize from "./config/database.js";
 import { connectRabbitMQ } from "./rabbitmq.js";
+import borrowRoutes from "./routes/borrowRoutes.js";
 import "./grpc/borrowServer.js";
 import { registerService } from "./src/registerService.js";
 import {
@@ -33,6 +34,8 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("Borrow Service Running");
 });
+
+app.use("/", borrowRoutes);
 
 app.get(
   "/health",

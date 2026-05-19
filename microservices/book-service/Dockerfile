@@ -5,6 +5,9 @@ WORKDIR /workspace
 COPY observability ./observability
 RUN cd observability && npm install --omit=dev
 
+COPY shared ./shared
+RUN cd shared && npm install --omit=dev
+
 COPY proto ./proto
 COPY book-service ./book-service
 

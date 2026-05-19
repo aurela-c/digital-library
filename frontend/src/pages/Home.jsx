@@ -8,16 +8,20 @@ import Events from "../components/Events";
 
 const Home = () => {
   return (
-    <div className="bg-[#f5efe9] min-h-screen  ">
+    <div className="bg-[#f5efe9] min-h-screen overflow-x-hidden">
       <HomeNavbar />
-        <Banner />
-        <div className="mt-12">
+
+      <Banner />
+
+      <div className="mt-12">
         <PopularNow />
       </div>
-      <Categories />
-      <Events />
-      <Footer />
 
+      <Categories />
+
+      <Events />
+
+      <Footer />
     </div>
   );
 };

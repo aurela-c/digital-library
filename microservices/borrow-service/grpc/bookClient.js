@@ -9,7 +9,9 @@ const grpcObject = grpc.loadPackageDefinition(packageDef);
 
 const bookPackage = grpcObject.book;
 
-const target = process.env.BOOK_SERVICE_GRPC || "localhost:5003";
+const target =
+  process.env.BOOK_SERVICE_GRPC ||
+  `localhost:${process.env.BOOK_GRPC_PORT || "5013"}`;
 
 export default new bookPackage.BookService(
   target,

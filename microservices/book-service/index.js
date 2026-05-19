@@ -3,6 +3,7 @@ import cors from "cors";
 import sequelize from "./config/database.js";
 import { connectRabbitMQ } from "./rabbitmq.js";
 import { startBookConsumer } from "./consumers/bookConsumer.js";
+import bookRoutes from "./routes/bookRoutes.js";
 import "./grpc/bookServer.js";
 import { registerService } from "./src/registerService.js";
 import {
@@ -34,6 +35,8 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("Book Service Running");
 });
+
+app.use("/", bookRoutes);
 
 app.get(
   "/health",

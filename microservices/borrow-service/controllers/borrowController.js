@@ -26,7 +26,7 @@ export const BorrowBook = async (call, callback) => {
   try {
     const { userId, bookId } = call.request;
 
-    // 📌 get book
+    //  get book
     const book = await getBookAsync({ id: bookId });
 
     const available = Number(book.availableCopies);
