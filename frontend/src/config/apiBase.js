@@ -20,6 +20,14 @@ export function getApiBaseURL() {
     return normalizeGatewayBase(gateway);
   }
 
-  // fallback for local dev if env missing
+  // Production builds MUST have VITE_GATEWAY_TARGET (set on Netlify).
+  // Local dev keeps the localhost fallback below.
+  if (import.meta.env?.PROD) {
+    throw new Error(
+      "VITE_GATEWAY_TARGET must be set for production builds (Netlify env)."
+    );
+  }
+
+  // fallback for local dev only
   return "http://localhost:4000";
 }

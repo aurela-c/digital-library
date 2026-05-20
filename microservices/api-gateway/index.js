@@ -64,8 +64,11 @@ app.use(
           return callback(null, true);
         }
       }
+      // Wildcard Netlify/Cloudflare Pages fallback — only when CORS_ORIGIN
+      // is NOT explicitly configured, so production can be strict.
       if (
         process.env.NODE_ENV === "production" &&
+        !process.env.CORS_ORIGIN &&
         /^https:\/\/[\w.-]+\.(netlify\.app|pages\.dev)$/.test(origin)
       ) {
         return callback(null, true);
