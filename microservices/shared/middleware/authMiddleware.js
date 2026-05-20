@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { getSecret } from "../../observability/config/secrets.js";
+import { toCanonicalRole } from "../constants/roles.js";
 
 const ACCESS_SECRET = getSecret("ACCESS_SECRET", "ACCESS_SECRET_KEY");
 
@@ -12,7 +13,7 @@ const normalizeUser = (decoded) => {
     ...decoded,
     id,
     userId: decoded.userId ?? id,
-    role: decoded.role,
+    role: toCanonicalRole(decoded.role),
   };
 };
 

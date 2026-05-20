@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import { isAdminRole, roleFromToken } from "../utils/roles.js";
 
 const AdminRoute = ({ children }) => {
   const token = localStorage.getItem("accessToken");
@@ -18,8 +19,15 @@ const AdminRoute = ({ children }) => {
       return <Navigate to="/login" replace />;
     }
 
-    const role = String(decoded.role || "").trim();
-    if (role !== "ROLE_ADMIN") {
+    let storedUser = null;
+    try {
+      const raw = localStorage.getItem("user");
+      if (raw) storedUser = JSON.parse(raw);
+    } catch {
+      storedUser = null;
+    }
+
+    if (!isAdminRole(roleFromToken(decoded, storedUser))) {
       return <Navigate to="/home" replace />;
     }
 

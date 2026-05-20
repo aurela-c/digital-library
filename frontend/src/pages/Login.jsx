@@ -4,6 +4,7 @@ import { login } from "../services/api";
 import { jwtDecode } from "jwt-decode";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import { toast } from "react-toastify";
+import { isAdminRole, roleFromToken } from "../utils/roles.js";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -35,8 +36,8 @@ const Login = () => {
 
       toast.success("Login successful!");
 
-      // ROUTING
-      if (decoded.role === "ROLE_ADMIN") {
+      // ROUTING (admin | ROLE_ADMIN | Admin from DB/JWT)
+      if (isAdminRole(roleFromToken(decoded, user))) {
         navigate("/admin");
       } else {
         navigate("/home");

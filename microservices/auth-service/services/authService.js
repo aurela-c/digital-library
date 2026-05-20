@@ -5,6 +5,7 @@ import { userRepository } from "../repositories/userRepository.js";
 import { sendEmail } from "../utils/emailService.js";
 import { auditLog } from "../utils/auditLog.js";
 import { getSecret } from "../../observability/config/secrets.js";
+import { isAdminRole, toCanonicalRole } from "../../shared/constants/roles.js";
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -29,7 +30,7 @@ const accessPayload = (user) => ({
   id: user.id,
   userId: user.id,
   email: user.email,
-  role: user.role || "ROLE_USER",
+  role: toCanonicalRole(user.role),
   typ: "access",
 });
 
@@ -55,7 +56,7 @@ const publicUser = (user) => ({
   id: user.id,
   username: user.username,
   email: user.email,
-  role: user.role,
+  role: toCanonicalRole(user.role),
   profileImage: user.profileImage ?? null,
   accountStatus: user.accountStatus ?? "ACTIVE",
 });
@@ -224,7 +225,7 @@ export const authService = {
 
   async getUserById(requestingUser, id) {
     if (
-      String(requestingUser.role) !== "ROLE_ADMIN" &&
+      !isAdminRole(requestingUser.role) &&
       String(requestingUser.id ?? requestingUser.sub) !== String(id)
     ) {
       const err = new Error("Forbidden");

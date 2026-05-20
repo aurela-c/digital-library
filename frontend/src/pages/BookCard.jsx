@@ -51,10 +51,8 @@ export default function BookCard() {
   return (
     <div className="h-screen bg-[#f5efe9] flex overflow-hidden">
 
-      {/* LEFT — cover + details side-by-side (fixed, no page scroll) */}
       <div className="flex-1 min-w-0 h-full overflow-hidden flex flex-col sm:flex-row items-start gap-6 lg:gap-10 px-6 sm:px-10 lg:px-14 py-8 lg:py-10">
 
-        {/* Cover */}
         <div className="shrink-0 w-full sm:w-auto flex flex-col items-center sm:items-start">
           <div className="relative flex justify-center w-full">
             <div
@@ -69,7 +67,6 @@ export default function BookCard() {
           </div>
         </div>
 
-        {/* Details — beside cover */}
         <div className="flex-1 min-w-0 max-w-2xl lg:max-w-3xl h-full overflow-hidden flex flex-col">
           <Link
             to="/home"
@@ -122,7 +119,6 @@ export default function BookCard() {
         </div>
       </div>
 
-      {/* RIGHT — more books  */}
       <aside className="w-[180px] lg:w-[200px] xl:w-[220px] shrink-0 h-screen bg-[#f5efe9] border-l border-[#e0d5ca] flex flex-col overflow-hidden">
         <div className="px-4 pt-5 pb-2 shrink-0">
           <p className="text-[10px] font-semibold tracking-[0.18em] text-gray-500 uppercase">

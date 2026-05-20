@@ -1,6 +1,7 @@
 import Borrow from "../models/BorrowedBook.js";
 import { promisify } from "util";
 import bookClient from "../grpc/bookClient.js";
+import { isAdminRole } from "../../shared/constants/roles.js";
 
 const getBookAsync = promisify(bookClient.GetBook.bind(bookClient));
 const updateAvailabilityAsync = promisify(
@@ -94,7 +95,7 @@ export const ReturnBook = async (call, callback) => {
       });
     }
 
-    const isAdmin = String(actorRole) === "ROLE_ADMIN";
+    const isAdmin = isAdminRole(actorRole);
     if (!isAdmin && String(borrow.user_id) !== String(actorUserId)) {
       return callback({
         code: 7,

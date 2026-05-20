@@ -5,7 +5,7 @@ Deploy the **React (Vite) frontend** on **Netlify**, the **Node.js microservices
 | Layer | Platform | Public URL |
 |-------|----------|------------|
 | Frontend SPA | Netlify | `https://the-boook-club.netlify.app` |
-| API Gateway | Railway | `https://<api-gateway>.up.railway.app` |
+| API Gateway | Railway | `https://digital-library-gateway-production.up.railway.app` |
 | Microservices | Railway (private + HTTP health) | Internal / per-service URLs |
 | MySQL | Railway MySQL | `MYSQL_URL` (private) |
 | Redis | Railway Redis | `REDIS_URL` (private) |
@@ -149,7 +149,7 @@ CONSUL_ENABLED=false
 NODE_ENV=production
 ACCESS_SECRET=<same-as-auth>
 REDIS_URL=${{Redis.REDIS_URL}}
-CORS_ORIGIN=https://your-app.netlify.app
+CORS_ORIGIN=https://the-boook-club.netlify.app
 AUTH_SERVICE_URL=https://<auth-service-public-domain>
 AUTH_SERVICE_GRPC=<auth-private-host>:5010
 USER_SERVICE_GRPC=<user-private-host>:5012
@@ -171,7 +171,7 @@ That URL is your **`VITE_GATEWAY_TARGET`** (no trailing slash).
 ### 3.6 Verify backend
 
 ```bash
-curl https://<api-gateway-domain>/health
+curl https://digital-library-gateway-production.up.railway.app/health
 ```
 
 Expect `status: "UP"` and dependency checks when all services are running.
@@ -197,7 +197,7 @@ Expect `status: "UP"` and dependency checks when all services are running.
 
 | Variable | Example | Notes |
 |----------|---------|--------|
-| `VITE_GATEWAY_TARGET` | `https://api-gateway-xxx.up.railway.app` | **Required** at build time |
+| `VITE_GATEWAY_TARGET` | `https://digital-library-gateway-production.up.railway.app` | **Required** at build time |
 
 Redeploy after changing `VITE_*` variables (they are baked into the static bundle).
 
@@ -277,7 +277,7 @@ On push to **`main`** (optional):
 
 | Symptom | Likely cause | Fix |
 |---------|----------------|-----|
-| CORS error in browser | Gateway `CORS_ORIGIN` missing Netlify URL | Add exact origin `https://....netlify.app` |
+| CORS error in browser | Gateway `CORS_ORIGIN` missing Netlify URL | Add exact origin `https://the-boook-club.netlify.app` |
 | 502 on `/auth/*` | `AUTH_SERVICE_URL` wrong or auth down | Check auth `/health`, fix URL |
 | gRPC errors in gateway logs | Wrong `*_SERVICE_GRPC` host/port | Use Railway private domains + fixed gRPC ports |
 | Blank API calls in production | `VITE_GATEWAY_TARGET` not set at Netlify build | Set variable, trigger rebuild |
@@ -291,8 +291,7 @@ On push to **`main`** (optional):
 ### Frontend (Netlify only)
 
 ```env
-VITE_GATEWAY_TARGET=https://<api-gateway>.up.railway.app
-```
+VITE_GATEWAY_TARGET=https://digital-library-gateway-production.up.railway.app
 
 ### Backend (Railway — see `microservices/.env.example`)
 

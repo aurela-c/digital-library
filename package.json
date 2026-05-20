@@ -16,6 +16,7 @@
     "tailwindcss": "^4.2.2"
   },
   "scripts": {
+    "start": "node index.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "test:auth": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/integration/auth.happy.test.js",

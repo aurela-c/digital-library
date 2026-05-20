@@ -12,6 +12,20 @@ export function normalizeRoleKey(role) {
     .replace(/^role_/, "");
 }
 
+/** Map DB/JWT variants to canonical ROLE_* values */
+export function toCanonicalRole(role) {
+  const key = normalizeRoleKey(role);
+  if (key === "admin") return ROLES.ADMIN;
+  if (key === "user") return ROLES.USER;
+  if (key === "librarian") return ROLES.LIBRARIAN;
+  const trimmed = String(role ?? "").trim();
+  return trimmed || ROLES.USER;
+}
+
+export function isAdminRole(role) {
+  return normalizeRoleKey(role) === "admin";
+}
+
 export const BORROW_ACTOR_ROLES = [
   ROLES.USER,
   ROLES.ADMIN,

@@ -112,8 +112,22 @@ export const getUser = (id) => API.get(`/users/${id}`);
 
 export const getAuthProfile = (id) => API.get(`/auth/${id}`);
 
-export const getBooks = () => API.get("/books");
+/** GET /books — API returns an array; some proxies/cache may wrap as { books: [] } */
+export const getBooks = async () => {
+  const res = await API.get("/books");
+  const payload = res.data;
+  if (Array.isArray(payload)) {
+    return res;
+  }
+  if (payload && Array.isArray(payload.books)) {
+    return { ...res, data: payload.books };
+  }
+  return { ...res, data: [] };
+};
 export const getBook = (id) => API.get(`/books/${id}`);
+export const createBook = (data) => API.post("/books", data);
+export const updateBook = (id, data) => API.put(`/books/${id}`, data);
+export const deleteBook = (id) => API.delete(`/books/${id}`);
 
 export const borrowBook = (data) => API.post("/borrow", data);
 export const getBorrowedBooks = (userId) => API.get(`/borrow/${userId}`);
