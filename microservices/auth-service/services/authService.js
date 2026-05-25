@@ -2,7 +2,10 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { userRepository } from "../repositories/userRepository.js";
-import { sendEmail } from "../utils/emailService.js";
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+} from "../utils/emailService.js";
 import { auditLog } from "../utils/auditLog.js";
 import { getSecret } from "../../observability/config/secrets.js";
 import { isAdminRole, toCanonicalRole } from "../../shared/constants/roles.js";
@@ -15,15 +18,43 @@ const REFRESH_SECRET = getSecret("REFRESH_SECRET", "REFRESH_SECRET_KEY");
 const ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || "1h";
 const REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
 
-const shouldSkipEmailVerification = () => {
-  const explicit = String(process.env.AUTH_SKIP_EMAIL_VERIFY || "").toLowerCase();
-  if (explicit === "true") return true;
-  if (explicit === "false") return false;
-  return !isProd;
-};
+// Reset token TTL — 1 hour per spec, override via env.
+const RESET_TOKEN_TTL_MS =
+  Number(process.env.PASSWORD_RESET_EXPIRES_MS) || 60 * 60 * 1000;
 
-const frontendAppBase = () =>
-  (process.env.FRONTEND_APP_URL || "http://localhost:5173").replace(/\/$/, "");
+// Verification JWT TTL — 24 hours (expiry is encoded in the JWT itself,
+// so no extra DB column is required).
+const VERIFICATION_TOKEN_TTL = process.env.VERIFICATION_TOKEN_TTL || "24h";
+
+// Verification is REQUIRED by default in every environment.
+// Only skipped when explicitly opted-out via AUTH_SKIP_EMAIL_VERIFY=true.
+const shouldSkipEmailVerification = () =>
+  String(process.env.AUTH_SKIP_EMAIL_VERIFY || "").toLowerCase() === "true";
+
+const backendBase = () =>
+  (process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5001}`)
+    .replace(/\/$/, "");
+
+const frontendBase = () =>
+  (process.env.FRONTEND_URL || process.env.FRONTEND_APP_URL || "http://localhost:5173")
+    .replace(/\/$/, "");
+
+// Email link points to a frontend PAGE so the user lands in a real UI,
+// not a raw backend response. The page then calls the backend verify endpoint
+// and auto-logs the user in.
+const buildVerifyUrl = (token) =>
+  `${frontendBase()}/verify-email?token=${encodeURIComponent(token)}`;
+
+const buildResetUrl = (token) =>
+  `${backendBase()}/auth/reset-password?token=${encodeURIComponent(token)}`;
+
+/** Sign a short-lived verification JWT. The string is stored in users.verification_token. */
+const signVerificationToken = (user) =>
+  jwt.sign(
+    { sub: String(user.id), email: user.email, typ: "verify" },
+    ACCESS_SECRET,
+    { expiresIn: VERIFICATION_TOKEN_TTL }
+  );
 
 const accessPayload = (user) => ({
   sub: String(user.id),
@@ -63,6 +94,8 @@ const publicUser = (user) => ({
 
 export const authService = {
   async register({ name, email, password }) {
+    console.log("REGISTER FLOW HIT ->", { email });
+
     if (!name || !email || !password) {
       const err = new Error("All fields are required");
       err.status = 400;
@@ -77,29 +110,29 @@ export const authService = {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const verificationToken = crypto.randomBytes(32).toString("hex");
     const skipVerify = shouldSkipEmailVerification();
 
-    await userRepository.create({
+    const createdUser = await userRepository.create({
       username: name,
       email,
       password: hashedPassword,
       role: "ROLE_USER",
       isVerified: skipVerify,
-      verificationToken: skipVerify ? null : verificationToken,
+      verificationToken: null,
       accountStatus: "ACTIVE",
     });
 
     if (!skipVerify) {
-      const verifyUrl = `${frontendAppBase()}/verify/${verificationToken}`;
+      const verificationToken = signVerificationToken(createdUser);
+      createdUser.verificationToken = verificationToken;
+      await createdUser.save();
+
       try {
-        await sendEmail(
-          email,
-          "Verify your account",
-          `<p>Welcome to Digital Library.</p><p><a href="${verifyUrl}">Verify your account</a></p>`
-        );
+        await sendVerificationEmail(email, buildVerifyUrl(verificationToken));
+        console.log("EMAIL SENT -> verification ->", email);
       } catch (err) {
-        console.error("EMAIL ERROR:", err.message);
+        // Email failure must not break registration — user can retry verification.
+        console.error(`EMAIL ERROR: registration verify email -> ${err.message}`);
       }
     }
 
@@ -112,9 +145,10 @@ export const authService = {
     return {
       status: 201,
       body: {
+        success: true,
         message: skipVerify
           ? "User registered. You can log in now."
-          : "User registered. Check email to verify account.",
+          : "Check your email to verify your account",
       },
     };
   },
@@ -141,9 +175,15 @@ export const authService = {
       throw err;
     }
 
+    console.log("LOGIN ATTEMPT USER VERIFIED STATUS ->", {
+      email,
+      is_verified: !!user.isVerified,
+    });
+
     if (!user.isVerified) {
-      const err = new Error("Verify your email first");
+      const err = new Error("Please verify your email before logging in");
       err.status = 403;
+      err.code = "EMAIL_NOT_VERIFIED";
       throw err;
     }
 
@@ -244,71 +284,179 @@ export const authService = {
   },
 
   async verifyEmail(token) {
-    const user = await userRepository.findByVerificationToken(token);
-    if (!user) {
-      const err = new Error("Invalid token");
+    if (!token || typeof token !== "string") {
+      const err = new Error("Verification token is required");
       err.status = 400;
+      err.code = "TOKEN_MISSING";
       throw err;
     }
+
+    // 1) Token must exist in DB (prevents reuse after success: we clear it on verify).
+    const user = await userRepository.findByVerificationToken(token);
+
+    // Special case: token cleared (account already verified by an earlier click).
+    // We can't auto-login here because we don't know who you are — the JWT alone
+    // could still tell us, so try that first.
+    if (!user) {
+      try {
+        const decoded = jwt.verify(token, ACCESS_SECRET);
+        if (decoded.typ === "verify" && decoded.sub) {
+          const alreadyVerified = await userRepository.findByPk(decoded.sub);
+          if (alreadyVerified?.isVerified) {
+            return {
+              status: 200,
+              body: {
+                success: true,
+                message: "Email already verified",
+                accessToken: signAccessToken(alreadyVerified),
+                refreshToken: issueRefreshToken(alreadyVerified),
+                user: publicUser(alreadyVerified),
+              },
+            };
+          }
+        }
+      } catch {
+        // fall through to generic invalid-token error below
+      }
+      const err = new Error("Invalid or expired verification link");
+      err.status = 400;
+      err.code = "TOKEN_INVALID";
+      throw err;
+    }
+
+    if (user.isVerified) {
+      // Idempotent: someone hit the link twice — auto-login again.
+      return {
+        status: 200,
+        body: {
+          success: true,
+          message: "Email already verified",
+          accessToken: signAccessToken(user),
+          refreshToken: issueRefreshToken(user),
+          user: publicUser(user),
+        },
+      };
+    }
+
+    // 2) JWT must still be valid (24h expiry encoded inside).
+    try {
+      const decoded = jwt.verify(token, ACCESS_SECRET);
+      if (decoded.typ !== "verify" || String(decoded.sub) !== String(user.id)) {
+        throw new Error("Token payload mismatch");
+      }
+    } catch {
+      const err = new Error("Verification link has expired. Please request a new one.");
+      err.status = 400;
+      err.code = "TOKEN_EXPIRED";
+      throw err;
+    }
+
+    // DB writes unchanged — schema untouched.
     user.isVerified = true;
     user.verificationToken = null;
     await user.save();
+
     auditLog({ action: "EMAIL_VERIFIED", userId: user.id });
-    return { status: 200, body: { message: "Email verified successfully" } };
+
+    // Mint auto-login credentials so the frontend can drop the user straight
+    // into the app without a manual login step.
+    const accessToken = signAccessToken(user);
+    const refreshToken = issueRefreshToken(user);
+
+    return {
+      status: 200,
+      body: {
+        success: true,
+        message: "Email verified successfully",
+        accessToken,
+        refreshToken,
+        user: publicUser(user),
+      },
+    };
   },
 
   async requestReset({ email }) {
-    if (!email) {
-      const err = new Error("Email required");
+    console.log("FORGOT PASSWORD TRIGGERED ->", { email });
+
+    if (!email || typeof email !== "string") {
+      const err = new Error("Valid email required");
       err.status = 400;
       throw err;
     }
 
-    const user = await userRepository.findByEmail(email);
+    // Always reply identically — never leak which emails exist.
+    const genericResponse = {
+      status: 200,
+      body: {
+        success: true,
+        message: "If an account exists for that email, a reset link has been sent.",
+      },
+    };
+
+    const user = await userRepository.findByEmail(email.trim().toLowerCase());
     if (!user) {
-      return { status: 200, body: { message: "If exists, email sent" } };
+      auditLog({ action: "PASSWORD_RESET_REQUEST_UNKNOWN", email });
+      return genericResponse;
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 3600000;
+    user.resetPasswordExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
     await user.save();
 
-    const resetUrl = `${frontendAppBase()}/reset-password/${resetToken}`;
     try {
-      await sendEmail(
-        email,
-        "Reset your password",
-        `<p>Click to reset your password (valid 1 hour):</p><p><a href="${resetUrl}">${resetUrl}</a></p>`
+      await sendPasswordResetEmail(
+        user.email,
+        buildResetUrl(resetToken),
+        Math.round(RESET_TOKEN_TTL_MS / 60000)
       );
+      console.log("EMAIL SENT -> reset ->", user.email);
     } catch (err) {
-      console.error("RESET EMAIL ERROR:", err.message);
+      console.error(`EMAIL ERROR: reset email -> ${err.message}`);
     }
 
-    auditLog({ action: "PASSWORD_RESET_REQUEST", email });
-    return { status: 200, body: { message: "Reset email sent" } };
+    auditLog({ action: "PASSWORD_RESET_REQUEST", userId: user.id });
+    return genericResponse;
   },
 
-  async resetPassword(token, { password }) {
-    if (!password) {
-      const err = new Error("Password required");
+  async resetPassword(token, { password, newPassword }) {
+    const pwd = newPassword ?? password;
+
+    if (!token || typeof token !== "string") {
+      const err = new Error("Reset token is required");
       err.status = 400;
+      err.code = "TOKEN_MISSING";
+      throw err;
+    }
+    if (!pwd || typeof pwd !== "string" || pwd.length < 8) {
+      const err = new Error("Password must be at least 8 characters");
+      err.status = 400;
+      err.code = "PASSWORD_WEAK";
       throw err;
     }
 
     const user = await userRepository.findByResetToken(token);
-    if (!user || !user.resetPasswordExpires || user.resetPasswordExpires < Date.now()) {
+    const expiresAt = user?.resetPasswordExpires
+      ? new Date(user.resetPasswordExpires).getTime()
+      : 0;
+
+    if (!user || !expiresAt || expiresAt < Date.now()) {
       const err = new Error("Invalid or expired token");
       err.status = 400;
+      err.code = "RESET_TOKEN_INVALID";
       throw err;
     }
 
-    user.password = await bcrypt.hash(password, 10);
+    user.password = await bcrypt.hash(pwd, 10);
+    // Clear immediately so the token can't be reused.
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
     await user.save();
 
     auditLog({ action: "PASSWORD_RESET_COMPLETE", userId: user.id });
-    return { status: 200, body: { message: "Password reset successful" } };
+    return {
+      status: 200,
+      body: { success: true, message: "Password reset successful" },
+    };
   },
 };

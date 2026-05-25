@@ -8,6 +8,8 @@ import {
   verifyEmail,
   requestReset,
   resetPassword,
+  resetPasswordRedirect,
+  testEmail,
 } from "../controllers/authController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { allowRoles } from "../middleware/roleMiddleware.js";
@@ -43,9 +45,25 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/refresh", refresh);
 router.post("/logout", logout);
+
+// --- Email verification ---
+// Spec endpoint (token via query string, link sent in email):
+router.get("/verify-email", verifyEmail);
+// Legacy alias used by existing frontend:
 router.get("/verify/:token", verifyEmail);
+
+// --- Forgot / reset password ---
+// Spec endpoints:
+router.post("/forgot-password", requestReset);
+router.get("/reset-password", resetPasswordRedirect); // email-link -> frontend form
+router.post("/reset-password", resetPassword);        // form submit (token in body)
+// Legacy aliases used by existing frontend:
 router.post("/reset-request", requestReset);
 router.post("/reset/:token", resetPassword);
+
+// --- SMTP diagnostic endpoint (dev only by default) ---
+// POST /auth/test-email  body: { to: "user@example.com" }
+router.post("/test-email", testEmail);
 
 router.get(
   "/admin",

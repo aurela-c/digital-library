@@ -4,6 +4,7 @@ import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
+import VerifyEmailSuccess from "./pages/VerifyEmailSuccess";
 import ResetPassword from "./pages/ResetPassword";
 import ResetRequest from "./pages/ResetRequest";
 
@@ -29,6 +30,11 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        {/* Email-verification landing page (auto-login + redirect to /home). */}
+        <Route path="/verify-email" element={<VerifyEmailSuccess />} />
+        {/* Back-compat alias for older email links. */}
+        <Route path="/verify-email-success" element={<VerifyEmailSuccess />} />
+        {/* Legacy path-param style (redirects internally to /verify-email). */}
         <Route path="/verify/:token" element={<VerifyEmail />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/forgot-password" element={<ResetRequest />} />

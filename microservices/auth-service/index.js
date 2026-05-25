@@ -81,6 +81,15 @@ const start = async () => {
     await sequelize.authenticate();
     logger.info("Database connected (users table — no ORM sync)");
 
+    // Probe SMTP at startup so missing/invalid credentials are visible
+    // immediately, not after the first registration attempt.
+    try {
+      const smtp = await verifyEmailTransport();
+      logger.info({ smtp }, `SMTP status: ${smtp.status}`);
+    } catch (e) {
+      logger.warn(`SMTP probe threw: ${e.message}`);
+    }
+
     const { startAuthGrpcServer } = await import("./grpc/authServer.js");
     await startAuthGrpcServer(logger);
 

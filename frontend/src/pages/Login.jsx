@@ -21,7 +21,7 @@ const Login = () => {
     try {
       const res = await login({ email, password });
 
-      const { accessToken, refreshToken, user } = res.data;
+      const { accessToken, refreshToken, user, message } = res.data;
 
             //  SAVE TOKENS 
       localStorage.setItem("accessToken", accessToken);
@@ -34,7 +34,7 @@ const Login = () => {
       // DECODE ROLE
       const decoded = jwtDecode(accessToken);
 
-      toast.success("Login successful!");
+      toast.success(message || "Login successful!");
 
       // ROUTING (admin | ROLE_ADMIN | Admin from DB/JWT)
       if (isAdminRole(roleFromToken(decoded, user))) {
@@ -48,10 +48,13 @@ const Login = () => {
 
       const data = err.response?.data;
 
+      // Backend now returns { success:false, message, error, code }.
+      // Prefer `message` (current spec), then `error` (legacy), then network message.
       const msg =
-        typeof data?.error === "string"
-          ? data.error
-          : data?.message || err.message || "Login failed";
+        (typeof data?.message === "string" && data.message) ||
+        (typeof data?.error === "string" && data.error) ||
+        err.message ||
+        "Login failed";
 
       toast.error(msg);
     } finally {
@@ -114,6 +117,15 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
+            </div>
+
+            <div className="flex justify-end -mt-2">
+              <Link
+                to="/forgot-password"
+                className="text-xs text-red-400 hover:underline"
+              >
+                Forgot password?
+              </Link>
             </div>
 
             <button
