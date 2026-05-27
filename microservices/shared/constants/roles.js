@@ -26,10 +26,17 @@ export function isAdminRole(role) {
   return normalizeRoleKey(role) === "admin";
 }
 
-export const BORROW_ACTOR_ROLES = [
-  ROLES.USER,
-  ROLES.ADMIN,
-  ROLES.LIBRARIAN,
-];
+/**
+ * Roles allowed to use the borrow flow (POST /borrow, PUT /return/:id).
+ *
+ * Admins are intentionally EXCLUDED: admins manage the library, they
+ * do not consume it. Any admin token hitting these routes is rejected
+ * by `allowRoles(...)` with a 403, mirroring the frontend which hides
+ * the borrow controls for admin sessions.
+ *
+ * Librarians keep borrow/return access because they may need to return
+ * items on behalf of users from internal tooling.
+ */
+export const BORROW_ACTOR_ROLES = [ROLES.USER, ROLES.LIBRARIAN];
 
 export const STAFF_BOOK_ROLES = [ROLES.ADMIN, ROLES.LIBRARIAN];

@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { toast } from "react-toastify";
 import { books } from "../data/books";
 import { useParams, Link } from "react-router-dom";
 import API from "../services/api";
+import { useIsAdmin } from "../utils/roles.js";
 
 export default function BookCard() {
   const { id } = useParams();
+  const isAdmin = useIsAdmin();
 
   const [selectedBook, setSelectedBook] = useState(() => {
     return books.find((b) => b.id === Number(id)) || books[0];
@@ -15,7 +18,7 @@ export default function BookCard() {
       const userId = localStorage.getItem("userId");
 
       if (!userId) {
-        alert("You must be logged in to borrow a book.");
+        toast.info("You must be logged in to borrow a book.");
         return;
       }
 
@@ -23,10 +26,14 @@ export default function BookCard() {
         bookId: String(selectedBook.id),
       });
 
-      alert("Book borrowed successfully!");
+      toast.success("Book borrowed successfully!");
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.error || "Borrow failed");
+      toast.error(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Borrow failed"
+      );
     }
   };
 
@@ -108,13 +115,22 @@ export default function BookCard() {
           </div>
 
           <div className="mt-6 shrink-0">
-            <button
-              type="button"
-              onClick={handleBorrow}
-              className="px-7 py-2.5 rounded-lg bg-[#D34F4E] text-white text-sm font-semibold tracking-wide shadow-sm hover:opacity-90 transition"
-            >
-              Borrow Book
-            </button>
+            {isAdmin ? (
+              // Admins manage the library — they don't borrow from it.
+              // Backend also rejects /borrow with 403 for admin tokens.
+              <div className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-800 sm:text-sm">
+                <span aria-hidden>ⓘ</span>
+                You are admin and cannot borrow books.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBorrow}
+                className="px-7 py-2.5 rounded-lg bg-[#D34F4E] text-white text-sm font-semibold tracking-wide shadow-sm hover:opacity-90 transition"
+              >
+                Borrow Book
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -10,6 +10,11 @@ import {
   resetPassword,
   resetPasswordRedirect,
   testEmail,
+  updateMyProfile,
+  changeMyPassword,
+  getMySession,
+  logoutAllDevices,
+  deleteMyAccount,
 } from "../controllers/authController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { allowRoles } from "../middleware/roleMiddleware.js";
@@ -82,6 +87,27 @@ router.get(
     res.json({ message: "User profile access" });
   }
 );
+
+// Trace which /me/* route was hit and what the resolved user id is.
+// Helps catch (a) stale processes that don't have these routes yet and
+// (b) mismatches between JWT payload and DB.
+const traceMe = (label) => (req, res, next) => {
+  const id = req.user?.id ?? req.user?.sub ?? null;
+  console.log(
+    `[auth /me] ${label} hit -> method=${req.method} path=${req.originalUrl} userId=${id}`
+  );
+  next();
+};
+
+// --- Profile self-service (authenticated user, any role) ---
+// Mounted BEFORE /:id so "/me/*" doesn't get swallowed by the wildcard.
+router.patch("/me", authMiddleware, traceMe("update-profile"), updateMyProfile);
+router.post("/me/password", authMiddleware, traceMe("change-password"), changeMyPassword);
+router.get("/me/session", authMiddleware, traceMe("session"), getMySession);
+router.post("/me/logout-all", authMiddleware, traceMe("logout-all"), logoutAllDevices);
+// POST (not DELETE) so the password confirmation body is reliably parsed by
+// every HTTP client and proxy in the chain.
+router.post("/me/delete", authMiddleware, traceMe("delete-account"), deleteMyAccount);
 
 router.get("/:id", authMiddleware, getUserById);
 

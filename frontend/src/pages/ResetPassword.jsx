@@ -5,8 +5,6 @@ import api from "../services/api";
 import PageContainer from "../components/layout/PageContainer";
 
 const ResetPassword = () => {
-  // Token may arrive as a path param (`/reset-password/:token`) OR a query string
-  // (`/reset-password?token=...`) depending on how the user got here.
   const params = useParams();
   const [search] = useSearchParams();
   const token = params.token || search.get("token") || "";
@@ -35,7 +33,7 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      // Spec endpoint: token in the body.
+
       const res = await api.post("/auth/reset-password", { token, password });
       const msg = res?.data?.message || "Password reset successful";
       toast.success(msg);

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
@@ -13,12 +13,38 @@ import Profile from "./pages/Profile";
 import BookCard from "./pages/BookCard";
 import CategoryBooks from "./pages/CategoryBooks";
 import AdminDashboard from "./pages/AdminDashboard";
+import Contact from "./pages/Contact";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AdminRoute from "./routes/AdminRoute";
+import { isAdminRole, readCurrentRole } from "./utils/roles.js";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+
+/**
+ * Admins no longer have a "user profile" page. They get the Admin
+ * Tools Panel instead. Any attempt (direct URL, old link, etc.) to
+ * reach /profile while logged in as admin is redirected to /admin.
+ */
+const ProfileRoute = () => {
+  if (isAdminRole(readCurrentRole())) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <Profile />;
+};
+
+/**
+ * Contact Us is the user-facing support form. Admins consume support
+ * tickets through the Admin Tools Panel (the Support section), so if an
+ * admin opens /contact directly they get redirected to /admin.
+ */
+const ContactRoute = () => {
+  if (isAdminRole(readCurrentRole())) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <Contact />;
+};
 
 function App() {
   return (
@@ -52,7 +78,7 @@ function App() {
           path="/profile"
           element={
             <ProtectedRoute>
-              <Profile />
+              <ProfileRoute />
             </ProtectedRoute>
           }
         />
@@ -74,6 +100,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/contact" element={<ContactRoute />} />
 
         <Route
           path="/admin"

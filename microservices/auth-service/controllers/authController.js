@@ -105,6 +105,92 @@ export const getUserById = async (req, res) => {
   }
 };
 
+// ---------- profile self-service (require auth) ----------
+
+const meId = (req) => req.user?.id ?? req.user?.sub;
+
+export const updateMyProfile = async (req, res) => {
+  try {
+    const { status, body } = await authService.updateProfile(
+      meId(req),
+      req.body || {}
+    );
+    return res.status(status).json(body);
+  } catch (err) {
+    return mapErr(err, res);
+  }
+};
+
+export const changeMyPassword = async (req, res) => {
+  try {
+    const { status, body } = await authService.changePassword(
+      meId(req),
+      req.body || {}
+    );
+    return res.status(status).json(body);
+  } catch (err) {
+    return mapErr(err, res);
+  }
+};
+
+export const deleteMyAccount = async (req, res) => {
+  try {
+    const { status, body } = await authService.deleteAccount(
+      meId(req),
+      req.body || {}
+    );
+    return res.status(status).json(body);
+  } catch (err) {
+    return mapErr(err, res);
+  }
+};
+
+/**
+ * GET /auth/me/session — describes the CURRENT access token + request metadata.
+ * No DB-backed sessions table, so this only shows the bearer that signed this
+ * request (plus the IP and User-Agent it came from).
+ */
+export const getMySession = (req, res) => {
+  const ipRaw =
+    req.headers["x-forwarded-for"] ||
+    req.socket?.remoteAddress ||
+    req.connection?.remoteAddress ||
+    "";
+  const ip = String(ipRaw).split(",")[0].trim() || null;
+
+  const exp = Number(req.user?.exp) || null;
+  const iat = Number(req.user?.iat) || null;
+
+  return res.json({
+    success: true,
+    session: {
+      userId: meId(req),
+      issuedAt: iat ? new Date(iat * 1000).toISOString() : null,
+      expiresAt: exp ? new Date(exp * 1000).toISOString() : null,
+      ip,
+      userAgent: req.headers["user-agent"] || null,
+    },
+  });
+};
+
+/**
+ * POST /auth/me/logout-all — best-effort sign-out signal.
+ *
+ * NOTE: this project uses stateless refresh JWTs (no refresh-token table),
+ * so we cannot revoke OTHER devices server-side without a schema change.
+ * We respond OK so the client can clear its own storage. A "real" global
+ * invalidation would need a `tokens_valid_after` column on users.
+ */
+export const logoutAllDevices = (req, res) => {
+  const id = meId(req);
+  console.log(`[auth] logout-all requested -> userId=${id} (best-effort)`);
+  return res.json({
+    success: true,
+    message: "Signed out on this device.",
+    note: "Other active sessions will expire automatically when their access tokens expire.",
+  });
+};
+
 export const verifyEmail = async (req, res) => {
   const token = req.query?.token || req.params?.token;
 

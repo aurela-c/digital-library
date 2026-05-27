@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => {
             "/users": { target: gateway, changeOrigin: true },
             "/books": { target: gateway, changeOrigin: true },
             "/borrow": { target: gateway, changeOrigin: true },
+            "/support": { target: gateway, changeOrigin: true },
           },
         }
       : undefined,

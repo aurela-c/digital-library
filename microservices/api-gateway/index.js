@@ -75,7 +75,7 @@ app.use(
       }
       return callback(null, false);
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
     exposedHeaders: ["X-Request-Id"],
   })
@@ -146,16 +146,29 @@ const authHttpProxy = async (req, res) => {
     const upstreamPath = pathname.replace(/^\/api(?=\/auth\b)/, "");
     const forwardUrl = `${base}${upstreamPath}${querySuffix}`;
 
+    // NB: the query string is already inside `forwardUrl`. We MUST NOT also
+    // pass `params: req.query` — axios would append it again and the upstream
+    // would receive duplicate values (e.g. `?token=X&token=X`).
     const response = await axios({
       method: req.method,
       url: forwardUrl,
-      params: req.query,
       data:
         req.method === "GET" || req.method === "HEAD" ? undefined : req.body,
       headers: forwardHeaders,
       validateStatus: () => true,
       timeout: Number(process.env.AUTH_PROXY_TIMEOUT_MS) || 30000,
     });
+
+    if (process.env.DEBUG_AUTH === "true") {
+      logger.debug(
+        {
+          method: req.method,
+          forwardUrl,
+          status: response.status,
+        },
+        "auth proxy <- upstream"
+      );
+    }
 
     if (typeof response.data === "object" && response.data !== null) {
       return res.status(response.status).json(response.data);
@@ -185,6 +198,11 @@ app.use(
 app.use(
   "/borrow",
   createServiceHttpProxy("/borrow", "BORROW_SERVICE_URL", "borrow-service", 5004)
+);
+// Help desk lives inside the user-service to avoid spinning up a new microservice.
+app.use(
+  "/support",
+  createServiceHttpProxy("/support", "USER_SERVICE_URL", "user-service", 5002)
 );
 
 app.get(

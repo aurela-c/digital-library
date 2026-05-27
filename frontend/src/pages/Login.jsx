@@ -1,10 +1,8 @@
 import React, { useContext, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login } from "../services/api";
-import { jwtDecode } from "jwt-decode";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import { toast } from "react-toastify";
-import { isAdminRole, roleFromToken } from "../utils/roles.js";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -31,25 +29,19 @@ const Login = () => {
       // CONTEXT UPDATE
       loginUser(accessToken, refreshToken, user);
 
-      // DECODE ROLE
-      const decoded = jwtDecode(accessToken);
-
       toast.success(message || "Login successful!");
 
-      // ROUTING (admin | ROLE_ADMIN | Admin from DB/JWT)
-      if (isAdminRole(roleFromToken(decoded, user))) {
-        navigate("/admin");
-      } else {
-        navigate("/home");
-      }
+      // Unified landing: admins and users go to the SAME library home.
+      // Admin powers are surfaced inline on user pages (book CRUD on
+      // category views, admin badge on profile, admin entries in nav).
+      navigate("/home");
 
     } catch (err) {
       console.error(err);
 
       const data = err.response?.data;
 
-      // Backend now returns { success:false, message, error, code }.
-      // Prefer `message` (current spec), then `error` (legacy), then network message.
+     
       const msg =
         (typeof data?.message === "string" && data.message) ||
         (typeof data?.error === "string" && data.error) ||

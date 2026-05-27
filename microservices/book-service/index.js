@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import { DataTypes } from "sequelize";
 import sequelize from "./config/database.js";
 import { connectRabbitMQ } from "./rabbitmq.js";
 import { startBookConsumer } from "./consumers/bookConsumer.js";
@@ -57,11 +58,41 @@ app.get(
 app.use(notFoundHandler);
 app.use(createErrorHandler(logger));
 
+/**
+ * Safe additive migrations. Sequelize's plain `sync()` will NOT add new
+ * columns to existing tables — it only creates tables that don't exist.
+ * So whenever the model gains a new column we add it explicitly via
+ * `queryInterface.addColumn`, guarded by an existence check so this is
+ * idempotent across restarts.
+ */
+async function ensureSchemaUpToDate() {
+  const qi = sequelize.getQueryInterface();
+  try {
+    const desc = await qi.describeTable("books");
+    if (!desc.is_popular) {
+      logger.info("Adding missing column books.is_popular");
+      await qi.addColumn("books", "is_popular", {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      });
+    }
+  } catch (err) {
+    // describeTable throws if the table doesn't exist yet — sequelize.sync()
+    // will create it from the model definition (including is_popular).
+    logger.warn(
+      { event: "ensure_schema_skipped", err: summarizeErr(err, 4) },
+      "Could not describe books table; relying on sync() to create it."
+    );
+  }
+}
+
 const start = async () => {
   try {
     await sequelize.authenticate();
     logger.info("Database connected");
     await sequelize.sync();
+    await ensureSchemaUpToDate();
     logger.info("Models synced");
 
     const mq = await connectRabbitMQ();

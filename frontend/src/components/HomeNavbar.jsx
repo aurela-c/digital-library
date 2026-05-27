@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FaUserCircle, FaBars, FaTimes, FaSearch } from "react-icons/fa";
+import {
+  FaUserCircle,
+  FaBars,
+  FaTimes,
+  FaSearch,
+  FaUserShield,
+} from "react-icons/fa";
 import { books } from "../data/books";
 import { getBooks } from "../services/api";
+import { useIsAdmin } from "../utils/roles.js";
 import PageContainer from "./layout/PageContainer";
 
 const categoryLinks = [
@@ -21,6 +28,7 @@ const HomeNavbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -181,9 +189,13 @@ const HomeNavbar = () => {
               Trending
             </a>
 
-            <Link to="/contact" className={desktopNavLink}>
-              Contact Us
-            </Link>
+            {/* Admins manage tickets from the Admin Tools Panel — they
+                don't have a user-facing Contact Us flow. */}
+            {!isAdmin && (
+              <Link to="/contact" className={desktopNavLink}>
+                Contact Us
+              </Link>
+            )}
           </div>
 
           {/* Desktop search */}
@@ -191,18 +203,33 @@ const HomeNavbar = () => {
             <SearchField />
           </div>
 
-          <Link to="/profile" className="hidden shrink-0 md:block">
-            <FaUserCircle className="text-3xl text-gray-700 transition hover:text-[#D34F4E]" />
+          {/* Profile icon — sends admins to the Admin Tools Panel (admins
+              no longer have a personal profile screen). */}
+          <Link
+            to={isAdmin ? "/admin" : "/profile"}
+            className="hidden shrink-0 md:block"
+            title={isAdmin ? "Admin Tools Panel" : "Profile"}
+            aria-label={isAdmin ? "Admin Tools Panel" : "Profile"}
+          >
+            {isAdmin ? (
+              <FaUserShield className="text-3xl text-[#D34F4E] transition hover:text-[#c04544]" />
+            ) : (
+              <FaUserCircle className="text-3xl text-gray-700 transition hover:text-[#D34F4E]" />
+            )}
           </Link>
 
           {/* Mobile: profile + burger */}
           <div className="flex shrink-0 items-center gap-1.5 md:hidden">
             <Link
-              to="/profile"
+              to={isAdmin ? "/admin" : "/profile"}
               className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-700 transition hover:bg-white/80 hover:text-[#D34F4E]"
-              aria-label="Profile"
+              aria-label={isAdmin ? "Admin Tools Panel" : "Profile"}
             >
-              <FaUserCircle className="text-2xl" />
+              {isAdmin ? (
+                <FaUserShield className="text-2xl text-[#D34F4E]" />
+              ) : (
+                <FaUserCircle className="text-2xl" />
+              )}
             </Link>
 
             <button
@@ -263,9 +290,11 @@ const HomeNavbar = () => {
                 Trending
               </a>
 
-              <Link to="/contact" onClick={closeMenu} className={navLink}>
-                Contact Us
-              </Link>
+              {!isAdmin && (
+                <Link to="/contact" onClick={closeMenu} className={navLink}>
+                  Contact Us
+                </Link>
+              )}
             </nav>
           </div>
         </div>

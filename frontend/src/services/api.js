@@ -110,11 +110,43 @@ export const logoutSession = (refreshToken) =>
 export const getMe = (id) => API.get(`/users/${id}`);
 export const getUser = (id) => API.get(`/users/${id}`);
 
+// --- Admin: user management ---
+export const getAllUsers = () => API.get("/users");
+export const updateUserRole = (id, role) =>
+  API.patch(`/users/${id}/role`, { role });
+export const updateUserStatus = (id, accountStatus) =>
+  API.patch(`/users/${id}/status`, { accountStatus });
+export const deleteUser = (id) => API.delete(`/users/${id}`);
+
+// --- Admin: aggregated dashboard stats ---
+export const getAdminStats = () => API.get("/users/admin/stats");
+
 export const getAuthProfile = (id) => API.get(`/auth/${id}`);
 
-/** GET /books — API returns an array; some proxies/cache may wrap as { books: [] } */
-export const getBooks = async () => {
-  const res = await API.get("/books");
+// --- Profile self-service ---
+export const updateMyProfile = (data) => API.patch("/auth/me", data);
+export const changeMyPassword = (data) => API.post("/auth/me/password", data);
+export const getMySession = () => API.get("/auth/me/session");
+export const logoutAllDevices = () => API.post("/auth/me/logout-all");
+export const deleteMyAccount = (data) => API.post("/auth/me/delete", data);
+
+/**
+ * GET /books — list books.
+ *
+ * Accepts optional filter params: `{ categoryId, author, title, page, limit }`.
+ * The API returns an array; some proxies/caches may wrap as `{ books: [] }`,
+ * so we normalise to always resolve `res.data` to a plain array.
+ */
+export const getBooks = async (params = {}) => {
+  const cleanParams = Object.fromEntries(
+    Object.entries(params).filter(
+      ([, v]) => v !== undefined && v !== null && v !== ""
+    )
+  );
+
+  const res = await API.get("/books", {
+    params: Object.keys(cleanParams).length ? cleanParams : undefined,
+  });
   const payload = res.data;
   if (Array.isArray(payload)) {
     return res;
@@ -129,8 +161,27 @@ export const createBook = (data) => API.post("/books", data);
 export const updateBook = (id, data) => API.put(`/books/${id}`, data);
 export const deleteBook = (id) => API.delete(`/books/${id}`);
 
+/** Admin-only: toggle a book's "Popular Now" flag. */
+export const setBookPopular = (id, isPopular) =>
+  API.patch(`/books/${id}`, { isPopular: Boolean(isPopular) });
+
 export const borrowBook = (data) => API.post("/borrow", data);
 export const getBorrowedBooks = (userId) => API.get(`/borrow/${userId}`);
 export const returnBook = (borrowId) => API.put(`/borrow/return/${borrowId}`);
+
+// --- Support / Help-desk tickets ---
+export const createSupportTicket = (data) => API.post("/support/tickets", data);
+export const getSupportTickets = (params = {}) =>
+  API.get("/support/tickets", { params });
+// Always returns the caller's own tickets, even for admins.
+export const getMySupportTickets = (params = {}) =>
+  API.get("/support/tickets/me", { params });
+export const getSupportTicket = (id) => API.get(`/support/tickets/${id}`);
+export const replySupportTicket = (id, data) =>
+  API.post(`/support/tickets/${id}/reply`, data);
+export const updateSupportTicketStatus = (id, status) =>
+  API.patch(`/support/tickets/${id}/status`, { status });
+export const updateSupportTicketPriority = (id, priority) =>
+  API.patch(`/support/tickets/${id}/priority`, { priority });
 
 export default API;

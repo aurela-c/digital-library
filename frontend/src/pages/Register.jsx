@@ -21,8 +21,7 @@ const Register = () => {
       const res = await register({ name, email, password });
       const data = res?.data || {};
 
-      // Use the backend message verbatim. We surface it ONCE via the global
-      // toast — no inline form banner — so the user doesn't see it twice.
+
       const msg =
         (typeof data.message === "string" && data.message) ||
         "Registration successful. Please check your email.";

@@ -263,6 +263,157 @@ export const authService = {
     return { status: 204, body: null };
   },
 
+  async updateProfile(userId, { username, profileImage }) {
+    console.log(`[authService] updateProfile -> userId=${userId}`);
+    if (!userId) {
+      const err = new Error("Not authenticated");
+      err.status = 401;
+      throw err;
+    }
+
+    const user = await userRepository.findByPk(userId);
+    console.log(
+      `[authService] updateProfile DB lookup -> userId=${userId} found=${!!user}`
+    );
+    if (!user) {
+      const err = new Error("User not found");
+      err.status = 404;
+      throw err;
+    }
+
+    if (username !== undefined) {
+      const trimmed = String(username).trim();
+      if (trimmed.length < 2 || trimmed.length > 50) {
+        const err = new Error("Username must be 2-50 characters");
+        err.status = 400;
+        throw err;
+      }
+      user.username = trimmed;
+    }
+
+    if (profileImage !== undefined) {
+      if (profileImage === null || profileImage === "") {
+        user.profileImage = null;
+      } else if (typeof profileImage === "string") {
+        // Soft cap to avoid blowing up a VARCHAR column with huge base64 payloads.
+        if (profileImage.length > 100_000) {
+          const err = new Error("Profile image is too large (max ~75KB)");
+          err.status = 413;
+          throw err;
+        }
+        user.profileImage = profileImage;
+      }
+    }
+
+    await user.save();
+    auditLog({ action: "PROFILE_UPDATED", userId: user.id });
+    return { status: 200, body: { success: true, user: publicUser(user) } };
+  },
+
+  async deleteAccount(userId, { password }) {
+    console.log(`[authService] deleteAccount -> userId=${userId}`);
+    if (!userId) {
+      const err = new Error("Not authenticated");
+      err.status = 401;
+      throw err;
+    }
+    if (!password || typeof password !== "string") {
+      const err = new Error("Password is required to delete your account");
+      err.status = 400;
+      err.code = "PASSWORD_REQUIRED";
+      throw err;
+    }
+
+    const user = await userRepository.findByPk(userId);
+    console.log(
+      `[authService] deleteAccount DB lookup -> userId=${userId} found=${!!user}`
+    );
+    if (!user) {
+      const err = new Error("User not found");
+      err.status = 404;
+      throw err;
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      auditLog({ action: "ACCOUNT_DELETE_FAILED", userId: user.id });
+      const err = new Error("Password is incorrect");
+      err.status = 400;
+      err.code = "PASSWORD_INVALID";
+      throw err;
+    }
+
+    const snapshot = { id: user.id, email: user.email };
+    await user.destroy();
+
+    auditLog({
+      action: "ACCOUNT_DELETED",
+      userId: snapshot.id,
+      email: snapshot.email,
+    });
+
+    return {
+      status: 200,
+      body: {
+        success: true,
+        message: "Your account has been permanently deleted.",
+      },
+    };
+  },
+
+  async changePassword(userId, { currentPassword, newPassword }) {
+    console.log(`[authService] changePassword -> userId=${userId}`);
+    if (!userId) {
+      const err = new Error("Not authenticated");
+      err.status = 401;
+      throw err;
+    }
+    if (!currentPassword || !newPassword) {
+      const err = new Error("Current and new password are required");
+      err.status = 400;
+      throw err;
+    }
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      const err = new Error("New password must be at least 8 characters");
+      err.status = 400;
+      err.code = "PASSWORD_WEAK";
+      throw err;
+    }
+    if (currentPassword === newPassword) {
+      const err = new Error("New password must be different from current password");
+      err.status = 400;
+      throw err;
+    }
+
+    const user = await userRepository.findByPk(userId);
+    console.log(
+      `[authService] changePassword DB lookup -> userId=${userId} found=${!!user}`
+    );
+    if (!user) {
+      const err = new Error("User not found");
+      err.status = 404;
+      throw err;
+    }
+
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) {
+      auditLog({ action: "PASSWORD_CHANGE_FAILED", userId: user.id });
+      const err = new Error("Current password is incorrect");
+      err.status = 400;
+      err.code = "CURRENT_PASSWORD_INVALID";
+      throw err;
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    auditLog({ action: "PASSWORD_CHANGED", userId: user.id });
+    return {
+      status: 200,
+      body: { success: true, message: "Password changed successfully" },
+    };
+  },
+
   async getUserById(requestingUser, id) {
     if (
       !isAdminRole(requestingUser.role) &&

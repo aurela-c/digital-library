@@ -1,7 +1,10 @@
 import { FaFacebook, FaInstagram, FaMapMarkerAlt, FaPhone, FaClock } from "react-icons/fa";
+import { Link } from "react-router-dom";
 import PageContainer from "./layout/PageContainer";
+import { useIsAdmin } from "../utils/roles.js";
 
 const Footer = () => {
+  const isAdmin = useIsAdmin();
   const sectionCard =
     "rounded-2xl border border-gray-200/60 bg-white/50 p-5 sm:p-6 backdrop-blur-sm";
 
@@ -86,7 +89,12 @@ const Footer = () => {
               className="flex flex-col items-center gap-1 md:items-start lg:items-end"
               aria-label="Footer help links"
             >
-              <p className={helpLink}>Contact Us</p>
+              {/* Hidden for admins — they manage support from /admin. */}
+              {!isAdmin && (
+                <Link to="/contact" className={helpLink}>
+                  Contact Us
+                </Link>
+              )}
               <p className={helpLink}>About Us</p>
               <p className={helpLink}>Privacy Policies</p>
             </nav>

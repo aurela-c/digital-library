@@ -4,6 +4,10 @@ import sequelize from "./config/database.js";
 import { connectRabbitMQ } from "./rabbitmq.js";
 import { startUserConsumer } from "./consumers/userConsumer.js";
 import userRoutes from "./routes/userRoutes.js";
+import supportRoutes from "./routes/supportRoutes.js";
+// Models — imported for side effects so sequelize.sync() creates the tables.
+import "./models/SupportTicket.js";
+import "./models/SupportTicketReply.js";
 import "./grpc/userServer.js";
 import { registerService } from "./src/registerService.js";
 import {
@@ -35,6 +39,10 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("User Service Running");
 });
+
+// Mount support BEFORE the user router so `/support/*` is matched first
+// (userRoutes contains a catch-all `/:id` GET).
+app.use("/support", supportRoutes);
 
 app.use("/", userRoutes);
 

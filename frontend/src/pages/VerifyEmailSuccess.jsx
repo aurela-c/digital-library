@@ -1,23 +1,11 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { jwtDecode } from "jwt-decode";
 import api from "../services/api";
 import PageContainer from "../components/layout/PageContainer";
 import { AuthContext } from "../../context/AuthContext.jsx";
-import { isAdminRole, roleFromToken } from "../utils/roles.js";
 
-/**
- * Verification landing page.
- *
- * Flow:
- *   1. User clicks the link in their email and lands here.
- *   2. We call GET /auth/verify-email?token=... (with Accept: application/json).
- *   3. Backend sets is_verified=1, clears verification_token, and returns
- *      { success, message, accessToken, refreshToken, user }.
- *   4. We persist the session via AuthContext.loginUser and redirect to
- *      /admin or /home depending on role — no manual login step required.
- */
+
 const VerifyEmailSuccess = () => {
   const [params] = useSearchParams();
   const token = params.get("token") || "";
@@ -30,7 +18,7 @@ const VerifyEmailSuccess = () => {
   const ranRef = useRef(false);
 
   useEffect(() => {
-    if (ranRef.current) return; // StrictMode dev double-invoke guard
+    if (ranRef.current) return; 
     ranRef.current = true;
 
     if (!token) {
@@ -46,8 +34,7 @@ const VerifyEmailSuccess = () => {
       })
       .then((res) => {
         const data = res?.data || {};
-        // Log so we can see exactly what came back if auto-login fails.
-        // eslint-disable-next-line no-console
+
         console.log("[verify-email] backend response:", {
           hasAccessToken: !!data.accessToken,
           hasRefreshToken: !!data.refreshToken,
@@ -60,23 +47,15 @@ const VerifyEmailSuccess = () => {
         setMessage(msg);
         setStatus("success");
 
-        // Auto-login if the backend returned credentials (it does on the new flow).
         if (data.accessToken && data.user) {
           loginUser(data.accessToken, data.refreshToken, data.user);
           toast.success("You're signed in!");
 
-          let decoded = null;
-          try {
-            decoded = jwtDecode(data.accessToken);
-          } catch {
-            /* ignore decode failure — fall back to user.role */
-          }
+          // Unified post-verification landing: everyone goes to /home.
+          // Admin powers are exposed inline through the shared UI rather
+          // than as a separate dashboard landing.
+          const target = "/home";
 
-          const target = isAdminRole(roleFromToken(decoded, data.user))
-            ? "/admin"
-            : "/home";
-
-          // Brief pause so the success screen is actually visible.
           let n = 3;
           setCountdown(n);
           const tick = setInterval(() => {
@@ -88,10 +67,7 @@ const VerifyEmailSuccess = () => {
             }
           }, 1000);
         } else {
-          // Backend didn't return tokens — likely an older auth-service build
-          // that needs restarting. Don't bounce to /login silently; surface
-          // the situation and offer a manual continue.
-          // eslint-disable-next-line no-console
+
           console.warn(
             "[verify-email] No auto-login tokens in response. " +
               "Restart auth-service so the new verifyEmail logic ships."

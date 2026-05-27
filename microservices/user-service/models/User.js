@@ -14,6 +14,16 @@ const User = sequelize.define(
       allowNull: true,
       field: "profile_image",
     },
+    isVerified: {
+      type: DataTypes.BOOLEAN,
+      field: "is_verified",
+      defaultValue: false,
+    },
+    accountStatus: {
+      type: DataTypes.STRING(16),
+      field: "account_status",
+      defaultValue: "ACTIVE",
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: true,

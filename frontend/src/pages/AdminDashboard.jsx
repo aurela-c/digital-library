@@ -1,11 +1,44 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { toast } from "react-toastify";
+import {
+  FiUsers,
+  FiBook,
+  FiGrid,
+  FiMenu,
+  FiX,
+  FiLogOut,
+  FiLifeBuoy,
+  FiSend,
+  FiRefreshCw,
+  FiTrash2,
+  FiEdit2,
+  FiPlus,
+  FiStar,
+} from "react-icons/fi";
 import {
   createBook,
   deleteBook,
+  deleteUser,
+  getAdminStats,
+  getAllUsers,
   getBooks,
+  getSupportTicket,
+  getSupportTickets,
+  replySupportTicket,
+  setBookPopular,
   updateBook,
+  updateSupportTicketPriority,
+  updateSupportTicketStatus,
+  updateUserRole,
+  updateUserStatus,
 } from "../services/api";
-import API from "../services/api";
+import { AuthContext } from "../../context/AuthContext.jsx";
+import {
+  BOOK_CATEGORIES,
+  categoryById,
+  labelForCategory,
+} from "../utils/categories.js";
 
 const asList = (data, nestedKey) => {
   if (Array.isArray(data)) return data;
@@ -13,271 +46,1702 @@ const asList = (data, nestedKey) => {
   return [];
 };
 
+const ROLE_OPTIONS = [
+  { value: "ROLE_USER", label: "User" },
+  { value: "ROLE_LIBRARIAN", label: "Librarian" },
+  { value: "ROLE_ADMIN", label: "Admin" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "ACTIVE", label: "Active" },
+  { value: "INACTIVE", label: "Inactive" },
+  { value: "BANNED", label: "Banned" },
+];
+
+const STATUS_STYLE = {
+  ACTIVE: "bg-green-100 text-green-700 ring-1 ring-green-200",
+  INACTIVE: "bg-amber-100 text-amber-700 ring-1 ring-amber-200",
+  BANNED: "bg-red-100 text-red-700 ring-1 ring-red-200",
+};
+
+/**
+ * Admin Tools Panel sections.
+ *
+ * This dashboard replaces the user profile entirely for admins. The
+ * full set of admin-only capabilities lives here: cross-account stats,
+ * user management, book CRUD with category grouping, and the support
+ * inbox. The same book CRUD is ALSO available inline on the public
+ * category pages — admins can use whichever workflow they prefer.
+ */
+const SECTIONS = [
+  { id: "overview", label: "Overview", icon: FiGrid },
+  { id: "users", label: "Users", icon: FiUsers },
+  { id: "books", label: "Books", icon: FiBook },
+  { id: "support", label: "Support", icon: FiLifeBuoy },
+];
+
+const TICKET_STATUS_STYLE = {
+  open: "bg-blue-100 text-blue-700 ring-1 ring-blue-200",
+  pending: "bg-amber-100 text-amber-700 ring-1 ring-amber-200",
+  resolved: "bg-green-100 text-green-700 ring-1 ring-green-200",
+  closed: "bg-gray-100 text-gray-600 ring-1 ring-gray-200",
+};
+
+const TICKET_STATUS_OPTIONS = ["open", "pending", "resolved", "closed"];
+const TICKET_PRIORITY_OPTIONS = ["low", "normal", "high"];
+const TICKET_CATEGORY_OPTIONS = ["technical", "account", "book", "general"];
+
+const fmtDateTime = (v) => {
+  if (!v) return "—";
+  try {
+    return new Date(v).toLocaleString();
+  } catch {
+    return String(v);
+  }
+};
+
 const AdminDashboard = () => {
+  const { user: currentUser, logout } = useContext(AuthContext);
+  const [section, setSection] = useState("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const [users, setUsers] = useState([]);
   const [books, setBooks] = useState([]);
-  const [error, setError] = useState(null);
-  const [bookForm, setBookForm] = useState({
-    title: "",
-    author: "",
-    categoryId: "1",
-    totalCopies: "1",
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState({
+    users: false,
+    books: false,
+    stats: false,
   });
-  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
-  const loadData = useCallback(async () => {
-    setError(null);
+  const loadUsers = useCallback(async () => {
+    setLoading((s) => ({ ...s, users: true }));
     try {
-      const [usersRes, booksRes] = await Promise.all([
-        API.get("/users"),
-        getBooks(),
-      ]);
-      setUsers(asList(usersRes.data, "users"));
-      setBooks(asList(booksRes.data, "books"));
+      const res = await getAllUsers();
+      setUsers(asList(res.data, "users"));
     } catch (err) {
-      setError(err.response?.data?.error || err.message);
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      setError(msg);
+      toast.error(`Could not load users: ${msg}`);
+    } finally {
+      setLoading((s) => ({ ...s, users: false }));
+    }
+  }, []);
+
+  const loadBooks = useCallback(async () => {
+    setLoading((s) => ({ ...s, books: true }));
+    try {
+      const res = await getBooks();
+      setBooks(asList(res.data, "books"));
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      setError(msg);
+    } finally {
+      setLoading((s) => ({ ...s, books: false }));
+    }
+  }, []);
+
+  const loadStats = useCallback(async () => {
+    setLoading((s) => ({ ...s, stats: true }));
+    try {
+      const res = await getAdminStats();
+      setStats(res.data?.stats || null);
+    } catch (err) {
+      // Stats are best-effort — fall back to derived numbers.
+      console.warn(
+        "[admin] stats endpoint failed, falling back to client aggregation:",
+        err.response?.data?.message || err.message
+      );
+      setStats(null);
+    } finally {
+      setLoading((s) => ({ ...s, stats: false }));
     }
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const handleCreateBook = async (e) => {
-    e.preventDefault();
-    setSaving(true);
     setError(null);
-    try {
-      await createBook({
-        title: bookForm.title,
-        author: bookForm.author,
-        categoryId: Number(bookForm.categoryId),
-        totalCopies: Number(bookForm.totalCopies),
-      });
-      setBookForm({
-        title: "",
-        author: "",
-        categoryId: "1",
-        totalCopies: "1",
-      });
-      await loadData();
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteBook = async (id) => {
-    if (!window.confirm("Delete this book?")) return;
-    setError(null);
-    try {
-      await deleteBook(id);
-      await loadData();
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-    }
-  };
-
-  const handleUpdateCopies = async (book) => {
-    const next = window.prompt(
-      "Available copies:",
-      String(book.availableCopies ?? book.available_copies ?? 0)
-    );
-    if (next === null) return;
-    setError(null);
-    try {
-      await updateBook(book.id, { availableCopies: Number(next) });
-      await loadData();
-    } catch (err) {
-      setError(err.response?.data?.error || err.message);
-    }
-  };
+    loadUsers();
+    loadBooks();
+    loadStats();
+  }, [loadUsers, loadBooks, loadStats]);
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#f5efe9]">
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-        <h1 className="mb-2 text-2xl font-bold text-[#D34F4E] sm:text-3xl">
-          Admin Dashboard
-        </h1>
-        <p className="mb-6 text-sm text-gray-600 sm:mb-8">
-          Manage users and books.
-        </p>
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-            {error}
-          </div>
-        )}
-
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <StatCard label="Users" value={users.length} />
-          <StatCard label="Books" value={books.length} />
-        </div>
-
-        <section className="mb-10">
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">Add book</h2>
-          <form
-            onSubmit={handleCreateBook}
-            className="grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-2"
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#f5efe9] text-gray-800">
+      {/* Mobile top bar */}
+      <header className="lg:hidden flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 sticky top-0 z-30">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-lg p-2 text-gray-700 hover:bg-gray-100"
+            aria-label="Open menu"
           >
-            <input
-              required
-              placeholder="Title"
-              className="rounded-lg border px-3 py-2 text-sm"
-              value={bookForm.title}
-              onChange={(e) =>
-                setBookForm((f) => ({ ...f, title: e.target.value }))
-              }
-            />
-            <input
-              required
-              placeholder="Author"
-              className="rounded-lg border px-3 py-2 text-sm"
-              value={bookForm.author}
-              onChange={(e) =>
-                setBookForm((f) => ({ ...f, author: e.target.value }))
-              }
-            />
-            <input
-              required
-              type="number"
-              min="1"
-              placeholder="Category ID"
-              className="rounded-lg border px-3 py-2 text-sm"
-              value={bookForm.categoryId}
-              onChange={(e) =>
-                setBookForm((f) => ({ ...f, categoryId: e.target.value }))
-              }
-            />
-            <input
-              required
-              type="number"
-              min="1"
-              placeholder="Total copies"
-              className="rounded-lg border px-3 py-2 text-sm"
-              value={bookForm.totalCopies}
-              onChange={(e) =>
-                setBookForm((f) => ({ ...f, totalCopies: e.target.value }))
-              }
-            />
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-lg bg-[#D34F4E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c04544] disabled:opacity-60 sm:col-span-2"
-            >
-              {saving ? "Saving…" : "Create book"}
-            </button>
-          </form>
-        </section>
+            <FiMenu className="h-5 w-5" />
+          </button>
+          <span className="text-sm font-semibold text-[#D34F4E]">Admin</span>
+        </div>
+        <Link to="/home" className="text-xs font-medium text-gray-500 hover:text-[#D34F4E]">
+          Back to app
+        </Link>
+      </header>
 
-        <section className="mb-10">
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">Books</h2>
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table className="w-full min-w-[320px] text-left text-sm">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-700">
-                <tr>
-                  <th className="px-3 py-3 sm:px-4">Title</th>
-                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">
-                    Author
-                  </th>
-                  <th className="px-3 py-3 sm:px-4">Available</th>
-                  <th className="px-3 py-3 sm:px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {books.map((b) => (
-                  <tr key={b.id} className="hover:bg-gray-50/80">
-                    <td className="max-w-[140px] break-words px-3 py-3 font-medium sm:max-w-none sm:px-4">
-                      {b.title}
-                    </td>
-                    <td className="hidden px-3 py-3 text-gray-600 sm:table-cell sm:px-4">
-                      {b.author}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 sm:px-4">
-                      {b.availableCopies ?? b.available_copies}
-                    </td>
-                    <td className="space-x-2 whitespace-nowrap px-3 py-3 sm:px-4">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateCopies(b)}
-                        className="text-xs font-medium text-[#D34F4E] hover:underline"
-                      >
-                        Edit copies
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteBook(b.id)}
-                        className="text-xs font-medium text-red-600 hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {books.length === 0 && !error && (
-              <p className="p-6 text-center text-sm text-gray-500">
-                No books loaded.
-              </p>
-            )}
-          </div>
-        </section>
+      <div className="flex">
+        {/* Sidebar (desktop) */}
+        <Sidebar
+          section={section}
+          setSection={setSection}
+          currentUser={currentUser}
+          onLogout={logout}
+          mobileOpen={sidebarOpen}
+          onCloseMobile={() => setSidebarOpen(false)}
+        />
 
-        <section>
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">Users</h2>
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table className="w-full min-w-[280px] text-left text-sm">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-700">
-                <tr>
-                  <th className="px-3 py-3 sm:px-4">User</th>
-                  <th className="hidden px-3 py-3 sm:table-cell sm:px-4">
-                    Email
-                  </th>
-                  <th className="px-3 py-3 sm:px-4">Role</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50/80">
-                    <td className="max-w-[140px] break-words px-3 py-3 font-medium text-gray-900 sm:max-w-none sm:px-4">
-                      {u.username}
-                      <div className="mt-0.5 text-xs font-normal text-gray-500 sm:hidden">
-                        {u.email}
-                      </div>
-                    </td>
-                    <td className="hidden break-all px-3 py-3 text-gray-600 sm:table-cell sm:px-4">
-                      {u.email}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-gray-700 sm:px-4">
-                      {u.role}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {users.length === 0 && !error && (
-              <p className="p-6 text-center text-sm text-gray-500">
-                No users loaded.
-              </p>
-            )}
-          </div>
-        </section>
+        {/* Main */}
+        <main className="flex-1 min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+          <PageHeader section={section} />
+
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              {error}
+            </div>
+          )}
+
+          {section === "overview" && (
+            <OverviewSection
+              users={users}
+              books={books}
+              stats={stats}
+              loading={loading}
+            />
+          )}
+
+          {section === "users" && (
+            <UsersSection
+              users={users}
+              loading={loading.users}
+              currentUserId={currentUser?.id}
+              onReload={() => {
+                loadUsers();
+                loadStats();
+              }}
+              onChangeRole={async (id, role) => {
+                try {
+                  const res = await updateUserRole(id, role);
+                  toast.success(res.data?.message || "Role updated");
+                  await loadUsers();
+                  await loadStats();
+                } catch (err) {
+                  toast.error(
+                    err.response?.data?.message ||
+                      err.response?.data?.error ||
+                      "Failed to update role"
+                  );
+                }
+              }}
+              onChangeStatus={async (id, accountStatus) => {
+                try {
+                  const res = await updateUserStatus(id, accountStatus);
+                  toast.success(res.data?.message || "Status updated");
+                  await loadUsers();
+                  await loadStats();
+                } catch (err) {
+                  toast.error(
+                    err.response?.data?.message ||
+                      err.response?.data?.error ||
+                      "Failed to update status"
+                  );
+                }
+              }}
+              onDeleteUser={async (id) => {
+                try {
+                  const res = await deleteUser(id);
+                  toast.success(res.data?.message || "User deleted");
+                  await loadUsers();
+                  await loadStats();
+                } catch (err) {
+                  toast.error(
+                    err.response?.data?.message ||
+                      err.response?.data?.error ||
+                      "Failed to delete user"
+                  );
+                }
+              }}
+            />
+          )}
+
+          {section === "books" && (
+            <BooksSection
+              books={books}
+              loading={loading.books}
+              onReload={() => {
+                loadBooks();
+                loadStats();
+              }}
+            />
+          )}
+
+          {section === "support" && (
+            <SupportSection currentUserId={currentUser?.id} />
+          )}
+        </main>
       </div>
     </div>
   );
 };
 
-function StatCard({ label, value }) {
+
+const Sidebar = ({
+  section,
+  setSection,
+  currentUser,
+  onLogout,
+  mobileOpen,
+  onCloseMobile,
+}) => {
+  const initial = (currentUser?.username || currentUser?.email || "A")
+    .slice(0, 1)
+    .toUpperCase();
+
+  const NavList = (
+    <nav className="px-3 py-4 space-y-1">
+      {SECTIONS.map(({ id, label, icon: Icon }) => {
+        const active = section === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => {
+              setSection(id);
+              onCloseMobile();
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
+              ${active
+                ? "bg-[#D34F4E] text-white shadow-sm"
+                : "text-gray-700 hover:bg-gray-100"}`}
+          >
+            <Icon className="h-4 w-4" />
+            <span>{label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-        {label}
-      </p>
-      <p className="mt-1 text-3xl font-bold text-[#D34F4E]">{value}</p>
+    <>
+      
+      <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-gray-200 bg-white min-h-screen sticky top-0">
+        <div className="px-5 py-5 border-b border-gray-100">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            Digital Library
+          </p>
+          <p className="mt-0.5 text-lg font-bold text-[#D34F4E]">Admin Panel</p>
+        </div>
+        {NavList}
+        <div className="mt-auto border-t border-gray-100 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-[#D34F4E] text-white flex items-center justify-center font-bold">
+              {initial}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">
+                {currentUser?.username || "Admin"}
+              </p>
+              <p className="truncate text-xs text-gray-500">
+                {currentUser?.email}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <FiLogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </div>
+      </aside>
+
+     
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-40 flex">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={onCloseMobile}
+            aria-hidden="true"
+          />
+          <aside className="relative w-64 bg-white shadow-xl flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <span className="text-sm font-bold text-[#D34F4E]">Admin Panel</span>
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                className="rounded-lg p-1 text-gray-500 hover:bg-gray-100"
+                aria-label="Close menu"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
+            </div>
+            {NavList}
+            <div className="mt-auto border-t border-gray-100 px-4 py-4">
+              <button
+                type="button"
+                onClick={onLogout}
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <FiLogOut className="h-4 w-4" />
+                Sign out
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+    </>
+  );
+};
+
+const PageHeader = ({ section }) => {
+  const titles = {
+    overview: { title: "Overview", subtitle: "Snapshot of users and catalog." },
+    users: {
+      title: "User management",
+      subtitle: "Search, change roles, activate or deactivate accounts.",
+    },
+    books: {
+      title: "Book management",
+      subtitle: "Browse the catalog by category, add, edit, or delete books.",
+    },
+    support: {
+      title: "Support tickets",
+      subtitle: "Read incoming requests, reply, and move them to resolution.",
+    },
+  };
+  const meta = titles[section] || titles.overview;
+  return (
+    <div className="mb-6">
+      <h1 className="text-2xl font-bold text-[#D34F4E] sm:text-3xl">
+        {meta.title}
+      </h1>
+      <p className="mt-1 text-sm text-gray-600">{meta.subtitle}</p>
     </div>
   );
-}
+};
+
+
+const OverviewSection = ({ users, books, stats, loading }) => {
+  // Use real backend stats when available; fall back to client-side
+  // aggregation if the stats endpoint is unreachable.
+  const totalUsers = stats?.totalUsers ?? users.length;
+  const activeUsers =
+    stats?.activeUsers ??
+    users.filter(
+      (u) => (u.accountStatus || "ACTIVE").toUpperCase() === "ACTIVE"
+    ).length;
+  const totalTickets = stats?.totalTickets ?? null;
+  const openTickets = stats?.openTickets ?? null;
+
+  const totalBooks = books.length;
+  const totalCategories = new Set(
+    books
+      .map((b) => Number(b.categoryId ?? b.category_id))
+      .filter((c) => Number.isFinite(c))
+  ).size;
+
+  const loadingUsers = loading.users || loading.stats;
+  const loadingBooks = loading.books;
+
+  return (
+    <section className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Total users" value={totalUsers} loading={loadingUsers} />
+        <StatCard
+          label="Active users"
+          value={activeUsers}
+          loading={loadingUsers}
+        />
+        <StatCard label="Total books" value={totalBooks} loading={loadingBooks} />
+        <StatCard
+          label="Categories"
+          value={totalCategories}
+          loading={loadingBooks}
+        />
+        <StatCard
+          label="Support tickets"
+          value={totalTickets ?? "—"}
+          loading={loading.stats}
+          hint={
+            openTickets !== null && totalTickets !== null
+              ? `${openTickets} open`
+              : null
+          }
+        />
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-gray-800">
+          Data sources
+        </h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Numbers above come from live queries against the production
+          database. Users, tickets and per-status counts are aggregated by
+          the user-service. Book and category totals are computed from the
+          books catalog returned by the book-service.
+        </p>
+      </div>
+    </section>
+  );
+};
+
+const StatCard = ({ label, value, loading, hint }) => (
+  <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+      {label}
+    </p>
+    <p className="mt-1 text-3xl font-bold text-[#D34F4E]">
+      {loading ? "—" : value}
+    </p>
+    {hint && <p className="mt-1 text-[11px] text-gray-500">{hint}</p>}
+  </div>
+);
+
+
+const UsersSection = ({
+  users,
+  loading,
+  currentUserId,
+  onReload,
+  onChangeRole,
+  onChangeStatus,
+  onDeleteUser,
+}) => {
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [confirmStatus, setConfirmStatus] = useState(null); // { user, nextStatus }
+  const [confirmDelete, setConfirmDelete] = useState(null); // user
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return users.filter((u) => {
+      if (roleFilter !== "ALL" && u.role !== roleFilter) return false;
+      const status = (u.accountStatus || "ACTIVE").toUpperCase();
+      if (statusFilter !== "ALL" && status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        String(u.username || "").toLowerCase().includes(q) ||
+        String(u.email || "").toLowerCase().includes(q) ||
+        String(u.id || "").includes(q)
+      );
+    });
+  }, [users, query, roleFilter, statusFilter]);
+
+  return (
+    <section>
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr,auto,auto,auto] gap-3">
+        <input
+          type="search"
+          placeholder="Search by name, email or ID…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[#D34F4E] focus:outline-none focus:ring-2 focus:ring-[#D34F4E]/20"
+        />
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+        >
+          <option value="ALL">All roles</option>
+          {ROLE_OPTIONS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+        >
+          <option value="ALL">All statuses</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={onReload}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-700">
+            <tr>
+              <th className="px-4 py-3">User</th>
+              <th className="px-4 py-3">Email</th>
+              <th className="px-4 py-3">Role</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Verified</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {loading && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500">
+                  Loading users…
+                </td>
+              </tr>
+            )}
+
+            {!loading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500">
+                  No users match the current filters.
+                </td>
+              </tr>
+            )}
+
+            {!loading &&
+              filtered.map((u) => {
+                const status = (u.accountStatus || "ACTIVE").toUpperCase();
+                const isSelf = String(u.id) === String(currentUserId);
+                return (
+                  <tr key={u.id} className="hover:bg-gray-50/80">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-[#D34F4E]/10 text-[#D34F4E] flex items-center justify-center text-xs font-bold">
+                          {(u.username || "?").slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-gray-900">
+                            {u.username || "—"}
+                            {isSelf && (
+                              <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-[#D34F4E]">
+                                you
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500">ID #{u.id}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 break-all">{u.email}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={u.role}
+                        disabled={isSelf}
+                        onChange={(e) => onChangeRole(u.id, e.target.value)}
+                        title={isSelf ? "You cannot change your own role" : "Change role"}
+                        className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs disabled:opacity-60"
+                      >
+                        {ROLE_OPTIONS.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          STATUS_STYLE[status] || STATUS_STYLE.ACTIVE
+                        }`}
+                      >
+                        {status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`text-xs font-medium ${
+                          u.isVerified ? "text-green-600" : "text-gray-400"
+                        }`}
+                      >
+                        {u.isVerified ? "Yes" : "No"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {status !== "ACTIVE" && (
+                          <button
+                            type="button"
+                            disabled={isSelf}
+                            onClick={() =>
+                              setConfirmStatus({ user: u, nextStatus: "ACTIVE" })
+                            }
+                            className="rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50"
+                          >
+                            Activate
+                          </button>
+                        )}
+                        {status !== "INACTIVE" && (
+                          <button
+                            type="button"
+                            disabled={isSelf}
+                            onClick={() =>
+                              setConfirmStatus({ user: u, nextStatus: "INACTIVE" })
+                            }
+                            className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                          >
+                            Deactivate
+                          </button>
+                        )}
+                        {status !== "BANNED" && (
+                          <button
+                            type="button"
+                            disabled={isSelf}
+                            onClick={() =>
+                              setConfirmStatus({ user: u, nextStatus: "BANNED" })
+                            }
+                            className="rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                          >
+                            Ban
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={isSelf}
+                          onClick={() => setConfirmDelete(u)}
+                          title={
+                            isSelf
+                              ? "You cannot delete your own account from the admin table. Use the Profile tab instead."
+                              : "Permanently delete this account"
+                          }
+                          className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-40"
+                        >
+                          <FiTrash2 className="text-[11px]" /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+      </div>
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete user account"
+          message={`Permanently delete ${
+            confirmDelete.username || confirmDelete.email
+          }? Their support tickets will also be removed. This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={async () => {
+            await onDeleteUser(confirmDelete.id);
+            setConfirmDelete(null);
+          }}
+        />
+      )}
+
+      {confirmStatus && (
+        <ConfirmDialog
+          title={`${confirmStatus.nextStatus === "ACTIVE" ? "Activate" : confirmStatus.nextStatus === "INACTIVE" ? "Deactivate" : "Ban"} user`}
+          message={`Are you sure you want to set ${
+            confirmStatus.user.username || confirmStatus.user.email
+          } to ${confirmStatus.nextStatus}?`}
+          confirmLabel="Confirm"
+          danger={confirmStatus.nextStatus !== "ACTIVE"}
+          onCancel={() => setConfirmStatus(null)}
+          onConfirm={async () => {
+            await onChangeStatus(confirmStatus.user.id, confirmStatus.nextStatus);
+            setConfirmStatus(null);
+          }}
+        />
+      )}
+    </section>
+  );
+};
+
+
+// Book management moved out of this dashboard: admins now create, edit,
+// and delete books directly on the public category pages (see
+// `pages/CategoryBooks.jsx`). Keeping the dashboard focused on data that
+// has no natural home elsewhere — users + support tickets.
+
+const ConfirmDialog = ({
+  title,
+  message,
+  confirmLabel = "Confirm",
+  danger,
+  onCancel,
+  onConfirm,
+}) => {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onCancel} aria-hidden="true" />
+      <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+        <p className="mt-2 text-sm text-gray-600">{message}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onConfirm();
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${
+              danger ? "bg-red-600 hover:bg-red-700" : "bg-[#D34F4E] hover:bg-[#c04544]"
+            }`}
+          >
+            {busy ? "Working…" : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// Book management — full CRUD grouped by category.
+// Mirrors the inline experience on `/categories/:category` so admins
+// have a single bird's-eye view of the entire catalog.
+// ============================================================
+const BooksSection = ({ books, loading, onReload }) => {
+  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [editor, setEditor] = useState(null); // { mode, book? }
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const normalize = (b) => ({
+    id: b.id,
+    title: b.title || "",
+    author: b.author || "",
+    image: b.image || "",
+    description: b.description || "",
+    categoryId: Number(b.categoryId ?? b.category_id) || null,
+    totalCopies: Number(b.totalCopies ?? b.total_copies) || 0,
+    availableCopies: Number(b.availableCopies ?? b.available_copies) || 0,
+    isPopular: Boolean(b.isPopular ?? b.is_popular),
+  });
+
+  const list = useMemo(() => books.map(normalize), [books]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return list.filter((b) => {
+      if (
+        categoryFilter !== "ALL" &&
+        Number(b.categoryId) !== Number(categoryFilter)
+      )
+        return false;
+      if (!q) return true;
+      return (
+        b.title.toLowerCase().includes(q) ||
+        b.author.toLowerCase().includes(q) ||
+        String(b.id).includes(q)
+      );
+    });
+  }, [list, query, categoryFilter]);
+
+  // Group by category so admins scan the catalog the way users do.
+  const grouped = useMemo(() => {
+    const buckets = new Map();
+    for (const b of filtered) {
+      const key = b.categoryId ?? "uncategorized";
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(b);
+    }
+    return [...buckets.entries()].sort((a, b) => {
+      if (a[0] === "uncategorized") return 1;
+      if (b[0] === "uncategorized") return -1;
+      return Number(a[0]) - Number(b[0]);
+    });
+  }, [filtered]);
+
+  const handleSave = async (form, mode) => {
+    const payload = {
+      title: form.title.trim(),
+      author: form.author.trim(),
+      image: form.image.trim() || null,
+      description: form.description.trim() || null,
+      categoryId: Number(form.categoryId),
+      totalCopies: Number(form.totalCopies),
+      isPopular: Boolean(form.isPopular),
+    };
+    if (form.availableCopies !== "") {
+      payload.availableCopies = Number(form.availableCopies);
+    }
+    if (!payload.title || !payload.author) {
+      throw new Error("Title and author are required");
+    }
+    if (!Number.isFinite(payload.categoryId) || payload.categoryId < 1) {
+      throw new Error("Pick a valid category");
+    }
+    if (!Number.isFinite(payload.totalCopies) || payload.totalCopies < 1) {
+      throw new Error("Total copies must be at least 1");
+    }
+
+    if (mode === "create") {
+      // POST /books goes through gRPC AddBook which doesn't carry the
+      // is_popular flag in the proto. Persist it via a follow-up PATCH
+      // when the admin explicitly opted in.
+      const createRes = await createBook(payload);
+      if (payload.isPopular) {
+        const newId = createRes.data?.id ?? createRes.data?.book?.id;
+        if (newId) {
+          await setBookPopular(newId, true).catch(() => null);
+        }
+      }
+      toast.success("Book added to catalog");
+    } else {
+      await updateBook(editor.book.id, payload);
+      toast.success("Book updated");
+    }
+    setEditor(null);
+    await onReload();
+  };
+
+  const handleTogglePopular = async (book) => {
+    try {
+      await setBookPopular(book.id, !book.isPopular);
+      toast.success(
+        !book.isPopular
+          ? `"${book.title}" added to Popular Now`
+          : `"${book.title}" removed from Popular Now`
+      );
+      await onReload();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Could not update Popular Now"
+      );
+    }
+  };
+
+  return (
+    <>
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr,auto,auto,auto]">
+        <input
+          type="search"
+          placeholder="Search by title, author or id…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[#D34F4E] focus:outline-none focus:ring-2 focus:ring-[#D34F4E]/20"
+        />
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+        >
+          <option value="ALL">All categories</option>
+          {BOOK_CATEGORIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={onReload}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          <FiRefreshCw className={loading ? "animate-spin" : ""} />
+          Refresh
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditor({ mode: "create", book: null })}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#D34F4E] px-3 py-2 text-sm font-semibold text-white hover:bg-[#c04544]"
+        >
+          <FiPlus />
+          New book
+        </button>
+      </div>
+
+      {loading && list.length === 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+          Loading catalog…
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+          No books match your filters.
+        </div>
+      )}
+
+      {grouped.map(([categoryId, items]) => (
+        <section key={String(categoryId)} className="mb-6">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">
+              {categoryId === "uncategorized"
+                ? "Uncategorized"
+                : labelForCategory(categoryId)}
+            </h2>
+            <span className="text-xs text-gray-500">{items.length} books</span>
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-700">
+                <tr>
+                  <th className="px-3 py-3 sm:px-4">Book</th>
+                  <th className="px-3 py-3 sm:px-4">Author</th>
+                  <th className="px-3 py-3 sm:px-4">Copies</th>
+                  <th className="px-3 py-3 sm:px-4">Popular</th>
+                  <th className="px-3 py-3 text-right sm:px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {items.map((b) => (
+                  <tr key={b.id} className="hover:bg-gray-50/80">
+                    <td className="px-3 py-3 sm:px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-9 shrink-0 overflow-hidden rounded bg-gray-100">
+                          {b.image ? (
+                            // eslint-disable-next-line jsx-a11y/alt-text
+                            <img
+                              src={b.image}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-gray-900">
+                            {b.title}
+                          </p>
+                          <p className="text-xs text-gray-500">ID #{b.id}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-gray-700 sm:px-4">
+                      {b.author}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 sm:px-4">
+                      <span className="font-medium text-gray-800">
+                        {b.availableCopies}
+                      </span>
+                      <span className="text-gray-400"> / {b.totalCopies}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 sm:px-4">
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePopular(b)}
+                        title={
+                          b.isPopular
+                            ? "Remove from Popular Now"
+                            : "Add to Popular Now"
+                        }
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ring-1 transition ${
+                          b.isPopular
+                            ? "bg-amber-50 text-amber-700 ring-amber-200 hover:bg-amber-100"
+                            : "bg-gray-50 text-gray-600 ring-gray-200 hover:bg-gray-100"
+                        }`}
+                      >
+                        <FiStar
+                          className={b.isPopular ? "fill-current" : ""}
+                        />
+                        {b.isPopular ? "Popular" : "Mark"}
+                      </button>
+                    </td>
+                    <td className="space-x-2 whitespace-nowrap px-3 py-3 text-right sm:px-4">
+                      <button
+                        type="button"
+                        onClick={() => setEditor({ mode: "edit", book: b })}
+                        className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                      >
+                        <FiEdit2 className="text-[11px]" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(b)}
+                        className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                      >
+                        <FiTrash2 className="text-[11px]" /> Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
+
+      {editor && (
+        <BookEditorModal
+          mode={editor.mode}
+          book={editor.book}
+          onCancel={() => setEditor(null)}
+          onSave={(form) => handleSave(form, editor.mode)}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete book"
+          message={`Permanently delete "${confirmDelete.title}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={async () => {
+            try {
+              await deleteBook(confirmDelete.id);
+              toast.success("Book deleted");
+              setConfirmDelete(null);
+              await onReload();
+            } catch (err) {
+              toast.error(
+                err.response?.data?.message ||
+                  err.response?.data?.error ||
+                  "Delete failed"
+              );
+            }
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+const BookEditorModal = ({ mode, book, onCancel, onSave }) => {
+  const [form, setForm] = useState(() => ({
+    title: book?.title || "",
+    author: book?.author || "",
+    image: book?.image || "",
+    description: book?.description || "",
+    categoryId: String(
+      book?.categoryId ?? BOOK_CATEGORIES[0]?.id ?? 1
+    ),
+    totalCopies: String(book?.totalCopies ?? 1),
+    availableCopies:
+      book?.availableCopies != null && book.availableCopies !== 0
+        ? String(book.availableCopies)
+        : "",
+    isPopular: Boolean(book?.isPopular),
+  }));
+  const [busy, setBusy] = useState(false);
+
+  const setField = (k) => (e) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await onSave(form);
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          err.message ||
+          "Save failed"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-8">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-gray-900">
+            {mode === "create" ? "Add a book" : `Edit "${book?.title || ""}"`}
+          </h3>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
+            aria-label="Close"
+          >
+            <FiX />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Title" required>
+              <input
+                required
+                maxLength={255}
+                value={form.title}
+                onChange={setField("title")}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </FormField>
+            <FormField label="Author" required>
+              <input
+                required
+                maxLength={255}
+                value={form.author}
+                onChange={setField("author")}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </FormField>
+            <FormField label="Category" required>
+              <select
+                value={form.categoryId}
+                onChange={setField("categoryId")}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              >
+                {BOOK_CATEGORIES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField
+              label="Cover image"
+              hint="Relative path like /images/book.jpg, a full https URL, or leave blank."
+            >
+              <input
+                // Plain text — `type=url` would HTML5-block relative
+                // paths like /images/book.jpg before the form submits.
+                type="text"
+                maxLength={512}
+                placeholder="/images/book.jpg or https://…"
+                value={form.image}
+                onChange={setField("image")}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </FormField>
+            <FormField label="Total copies" required>
+              <input
+                type="number"
+                min="1"
+                required
+                value={form.totalCopies}
+                onChange={setField("totalCopies")}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </FormField>
+            <FormField
+              label="Available copies"
+              hint={
+                mode === "create"
+                  ? "Defaults to total copies."
+                  : "Leave blank to keep current value."
+              }
+            >
+              <input
+                type="number"
+                min="0"
+                value={form.availableCopies}
+                onChange={setField("availableCopies")}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Description">
+            <textarea
+              rows={4}
+              maxLength={5000}
+              value={form.description}
+              onChange={setField("description")}
+              className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+          </FormField>
+
+          <label className="flex items-start gap-3 rounded-lg border border-amber-200/70 bg-amber-50/50 px-4 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={form.isPopular}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, isPopular: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#D34F4E] focus:ring-[#D34F4E]/30"
+            />
+            <span>
+              <span className="font-semibold text-amber-900">
+                Feature in Popular Now
+              </span>
+              <span className="mt-0.5 block text-[11px] text-amber-800/80">
+                Showcases this book on the homepage carousel.
+              </span>
+            </span>
+          </label>
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={busy}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-lg bg-[#D34F4E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#c04544] disabled:opacity-60"
+            >
+              {busy
+                ? "Saving…"
+                : mode === "create"
+                ? "Add to catalog"
+                : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const FormField = ({ label, required, hint, children }) => (
+  <label className="block">
+    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+      {label} {required && <span className="text-red-500">*</span>}
+    </span>
+    {children}
+    {hint && <p className="mt-1 text-[11px] text-gray-400">{hint}</p>}
+  </label>
+);
+
+// ============================================================
+// Admin Support / Help-desk
+// ============================================================
+const SupportSection = ({ currentUserId }) => {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState({ status: "ALL", category: "ALL", q: "" });
+  const [activeId, setActiveId] = useState(null);
+  const [activeTicket, setActiveTicket] = useState(null);
+  const [loadingActive, setLoadingActive] = useState(false);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [replying, setReplying] = useState(false);
+
+  const loadList = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (filters.status !== "ALL") params.status = filters.status;
+      if (filters.category !== "ALL") params.category = filters.category;
+      const res = await getSupportTickets(params);
+      setTickets(Array.isArray(res.data?.tickets) ? res.data.tickets : []);
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to load tickets"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [filters.status, filters.category]);
+
+  useEffect(() => {
+    loadList();
+  }, [loadList]);
+
+  const openTicket = useCallback(async (id) => {
+    setActiveId(id);
+    setActiveTicket(null);
+    setReplyDraft("");
+    setLoadingActive(true);
+    try {
+      const res = await getSupportTicket(id);
+      setActiveTicket(res.data?.ticket || null);
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Could not load ticket"
+      );
+    } finally {
+      setLoadingActive(false);
+    }
+  }, []);
+
+  const refreshActive = useCallback(async () => {
+    if (!activeId) return;
+    try {
+      const res = await getSupportTicket(activeId);
+      setActiveTicket(res.data?.ticket || null);
+    } catch {
+      /* ignore */
+    }
+  }, [activeId]);
+
+  const handleReply = async (e) => {
+    e.preventDefault();
+    const msg = replyDraft.trim();
+    if (!msg || !activeTicket) return;
+    setReplying(true);
+    try {
+      const res = await replySupportTicket(activeTicket.id, { message: msg });
+      setActiveTicket(res.data?.ticket || activeTicket);
+      setReplyDraft("");
+      loadList();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to send reply"
+      );
+    } finally {
+      setReplying(false);
+    }
+  };
+
+  const handleStatus = async (status) => {
+    if (!activeTicket) return;
+    try {
+      const res = await updateSupportTicketStatus(activeTicket.id, status);
+      toast.success(res.data?.message || `Marked ${status}`);
+      await refreshActive();
+      loadList();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update status"
+      );
+    }
+  };
+
+  const handlePriority = async (priority) => {
+    if (!activeTicket) return;
+    try {
+      const res = await updateSupportTicketPriority(activeTicket.id, priority);
+      toast.success(res.data?.message || `Priority ${priority}`);
+      await refreshActive();
+      loadList();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          "Failed to update priority"
+      );
+    }
+  };
+
+  const filtered = useMemo(() => {
+    const q = filters.q.trim().toLowerCase();
+    if (!q) return tickets;
+    return tickets.filter((t) => {
+      const u = t.requester || {};
+      return (
+        String(t.id).includes(q) ||
+        String(t.subject || "").toLowerCase().includes(q) ||
+        String(u.username || "").toLowerCase().includes(q) ||
+        String(u.email || "").toLowerCase().includes(q)
+      );
+    });
+  }, [tickets, filters.q]);
+
+  const counts = useMemo(() => {
+    const out = { open: 0, pending: 0, resolved: 0, closed: 0 };
+    for (const t of tickets) out[t.status] = (out[t.status] || 0) + 1;
+    return out;
+  }, [tickets]);
+
+  return (
+    <section>
+      {/* Quick stats */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {TICKET_STATUS_OPTIONS.map((s) => (
+          <div
+            key={s}
+            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              {s}
+            </p>
+            <p className="mt-1 text-2xl font-bold text-[#D34F4E]">
+              {counts[s] || 0}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr,auto,auto,auto]">
+        <input
+          type="search"
+          placeholder="Search subject, user or ID…"
+          value={filters.q}
+          onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[#D34F4E] focus:outline-none focus:ring-2 focus:ring-[#D34F4E]/20"
+        />
+        <select
+          value={filters.status}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, status: e.target.value }))
+          }
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+        >
+          <option value="ALL">All statuses</option>
+          {TICKET_STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filters.category}
+          onChange={(e) =>
+            setFilters((f) => ({ ...f, category: e.target.value }))
+          }
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+        >
+          <option value="ALL">All categories</option>
+          {TICKET_CATEGORY_OPTIONS.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={loadList}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          <FiRefreshCw className={loading ? "animate-spin" : ""} />
+          Refresh
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        {/* Ticket list */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-2">
+          <div className="max-h-[640px] overflow-y-auto divide-y divide-gray-100">
+            {loading && tickets.length === 0 && (
+              <p className="px-4 py-6 text-center text-sm text-gray-500">
+                Loading tickets…
+              </p>
+            )}
+            {!loading && filtered.length === 0 && (
+              <p className="px-4 py-6 text-center text-sm text-gray-500">
+                No tickets match.
+              </p>
+            )}
+            {filtered.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => openTicket(t.id)}
+                className={`block w-full px-4 py-3 text-left transition hover:bg-gray-50 ${
+                  activeId === t.id ? "bg-[#D34F4E]/5" : ""
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {t.subject}
+                  </p>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      TICKET_STATUS_STYLE[t.status] || TICKET_STATUS_STYLE.open
+                    }`}
+                  >
+                    {t.status}
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-xs text-gray-500">
+                  #{t.id} · {t.category} ·{" "}
+                  {t.requester?.username || t.requester?.email || `user ${t.userId}`}
+                </p>
+                <p className="mt-0.5 text-[11px] text-gray-400">
+                  Updated {fmtDateTime(t.updatedAt)}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Detail */}
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-3">
+          {!activeId ? (
+            <div className="grid h-full min-h-[320px] place-items-center px-6 py-10 text-center text-sm text-gray-500">
+              Select a ticket on the left to view the conversation.
+            </div>
+          ) : loadingActive ? (
+            <div className="grid h-full min-h-[320px] place-items-center px-6 py-10 text-sm text-gray-500">
+              Loading…
+            </div>
+          ) : activeTicket ? (
+            <AdminTicketDetail
+              ticket={activeTicket}
+              currentUserId={currentUserId}
+              replyDraft={replyDraft}
+              setReplyDraft={setReplyDraft}
+              replying={replying}
+              onReply={handleReply}
+              onChangeStatus={handleStatus}
+              onChangePriority={handlePriority}
+            />
+          ) : (
+            <div className="grid h-full min-h-[320px] place-items-center px-6 py-10 text-sm text-gray-500">
+              Ticket unavailable.
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const AdminTicketDetail = ({
+  ticket,
+  currentUserId,
+  replyDraft,
+  setReplyDraft,
+  replying,
+  onReply,
+  onChangeStatus,
+  onChangePriority,
+}) => {
+  const closed = ticket.status === "closed";
+  return (
+    <>
+      <div className="border-b border-gray-100 px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold text-gray-900">
+              {ticket.subject}
+            </h3>
+            <p className="mt-0.5 text-xs text-gray-500">
+              #{ticket.id} · {ticket.category} · opened{" "}
+              {fmtDateTime(ticket.createdAt)}
+            </p>
+            <p className="mt-1 text-xs text-gray-600">
+              From{" "}
+              <span className="font-medium">
+                {ticket.requester?.username ||
+                  ticket.requester?.email ||
+                  `user ${ticket.userId}`}
+              </span>
+              {ticket.requester?.email ? (
+                <span className="text-gray-400"> · {ticket.requester.email}</span>
+              ) : null}
+            </p>
+          </div>
+
+          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
+            <label className="text-xs text-gray-500">
+              Status
+              <select
+                value={ticket.status}
+                onChange={(e) => onChangeStatus(e.target.value)}
+                className="ml-2 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs"
+              >
+                {TICKET_STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-gray-500">
+              Priority
+              <select
+                value={ticket.priority}
+                onChange={(e) => onChangePriority(e.target.value)}
+                className="ml-2 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs"
+              >
+                {TICKET_PRIORITY_OPTIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-h-[440px] space-y-3 overflow-y-auto px-5 py-4">
+        <AdminBubble
+          mine={ticket.userId === currentUserId}
+          authorRole="user"
+          author={ticket.requester}
+          message={ticket.message}
+          createdAt={ticket.createdAt}
+        />
+        {(ticket.replies || []).map((r) => (
+          <AdminBubble
+            key={r.id}
+            mine={r.authorId === currentUserId}
+            authorRole={r.authorRole}
+            author={r.author}
+            message={r.message}
+            createdAt={r.createdAt}
+          />
+        ))}
+      </div>
+
+      {!closed ? (
+        <form onSubmit={onReply} className="border-t border-gray-100 px-5 py-4">
+          <textarea
+            rows={3}
+            value={replyDraft}
+            onChange={(e) => setReplyDraft(e.target.value)}
+            placeholder="Type your reply to the user…"
+            className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[#D34F4E] focus:outline-none focus:ring-2 focus:ring-[#D34F4E]/20"
+          />
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-[11px] text-gray-400">
+              Replying as admin marks the ticket as pending.
+            </p>
+            <button
+              type="submit"
+              disabled={replying || !replyDraft.trim()}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#D34F4E] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#c04544] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FiSend className="text-[11px]" />
+              {replying ? "Sending…" : "Send reply"}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <p className="border-t border-gray-100 px-5 py-3 text-xs text-gray-500">
+          This ticket is closed. Reopen it from the status dropdown to add more
+          replies.
+        </p>
+      )}
+    </>
+  );
+};
+
+const AdminBubble = ({ mine, authorRole, author, message, createdAt }) => {
+  const isAdmin = authorRole === "admin";
+  return (
+    <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[85%] rounded-xl px-3 py-2 text-sm shadow-sm ${
+          mine
+            ? "bg-[#D34F4E] text-white"
+            : isAdmin
+            ? "bg-blue-50 text-blue-900 ring-1 ring-blue-100"
+            : "bg-gray-100 text-gray-800"
+        }`}
+      >
+        <div className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+          {author?.username || (isAdmin ? "Support" : `user ${""}`)}
+          <span className="opacity-70"> · {fmtDateTime(createdAt)}</span>
+        </div>
+        <p className="mt-1 whitespace-pre-wrap break-words">{message}</p>
+      </div>
+    </div>
+  );
+};
 
 export default AdminDashboard;
