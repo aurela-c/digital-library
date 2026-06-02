@@ -7,6 +7,17 @@ const mapErr = (err, res) => {
     status >= 500 && process.env.NODE_ENV === "production"
       ? "Server error"
       : err.message || "Server error";
+
+  // Always log unexpected 5xx errors to stderr — even in production.
+  // The wire response stays generic ("Server error") for clients, but
+  // operators retain a real stack trace in the container logs, which is
+  // essential for any kind of post-mortem (otherwise a 500 looks
+  // identical to a request validation issue in `docker logs`).
+  if (status >= 500) {
+    // eslint-disable-next-line no-console
+    console.error("[auth] 5xx ->", err.stack || err.message || err);
+  }
+
   // Provide BOTH `error` (legacy) and `message` (current spec) so any frontend works.
   const payload = {
     success: false,

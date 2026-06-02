@@ -12,50 +12,55 @@ import {
   bookTileTitle,
   bookTileAuthor,
   bookBorrowBtn,
+  coverImgProps,
 } from "./layout/BookCardStyles";
 
 /**
- * Build the "Popular Now" list by merging:
- *   1. Admin-curated DB picks (`is_popular = true`) — source of truth.
- *   2. Seed `featured` books — fallback shown on a fresh DB / when no
- *      admin has curated yet, so the homepage is never empty.
+ * Build the "Popular Now" list.
  *
- * DB entries always win on id collision.
+ * The list is STRICTLY DB-driven once any book has been flagged as
+ * popular by an admin. The previous behaviour merged seeded `featured`
+ * books with DB rows, which had two bad consequences:
+ *
+ *   1. A seeded book with no DB row (the common case on a fresh DB)
+ *      could never be removed — clicking "Remove from Popular" would
+ *      PATCH /books/<seed_id> and 404, leaving the seed row visible
+ *      forever. That looked exactly like "popular books logic is stuck"
+ *      in the issue report.
+ *   2. Admin-added popular books were rendered alongside seeded ones,
+ *      so the carousel didn't reflect the real curated state.
+ *
+ * New rules:
+ *   - If the DB has at least one book with `is_popular = true`, render
+ *     ONLY those. This makes the carousel a faithful mirror of what
+ *     admins actually picked.
+ *   - If the DB has zero popular books (or the API failed and we got an
+ *     empty array), fall back to the seeded `featured` books so a fresh
+ *     install / signed-out visitor still sees content. As soon as an
+ *     admin marks any book popular, the seeded fallback disappears.
  */
 function buildPopularList(apiBooks) {
-  const byId = new Map();
-
-  // Start with seeded featured books so non-admin/unauthenticated
-  // visitors still see content before anyone has flagged anything.
-  for (const b of seedBooks) {
-    if (!b.featured) continue;
-    byId.set(String(b.id), {
-      id: b.id,
-      title: b.title,
-      author: b.author,
-      image: b.image,
-      source: "seed",
-    });
-  }
-
-  for (const b of apiBooks) {
-    if (!b.isPopular) {
-      // Drop seeded fallback if the admin has explicitly unflagged it.
-      // (Same id in DB with is_popular=false should hide it.)
-      // Only remove if we know the DB record exists — otherwise leave seed.
-      byId.delete(String(b.id));
-      continue;
-    }
-    byId.set(String(b.id), {
+  const dbPopular = apiBooks
+    .filter((b) => Boolean(b.isPopular))
+    .map((b) => ({
       id: b.id,
       title: b.title || "",
       author: b.author || "",
       image: b.image || "",
       source: "api",
-    });
-  }
+    }));
 
-  return [...byId.values()];
+  if (dbPopular.length > 0) return dbPopular;
+
+  return seedBooks
+    .filter((b) => b.featured)
+    .map((b) => ({
+      id: b.id,
+      title: b.title,
+      author: b.author,
+      image: b.image,
+      source: "seed",
+    }));
 }
 
 function PopularNow() {
@@ -103,6 +108,15 @@ function PopularNow() {
   };
 
   const togglePopular = async (book, next) => {
+    // Guard: seeded fallback books are NOT in the DB. They appear only
+    // while the catalog has zero admin-curated popular books. There is
+    // nothing to PATCH for them, so we explain instead of 404'ing.
+    if (book.source === "seed") {
+      toast.info(
+        "This is a default fallback book. Use 'Manage Popular Now' to add a real catalog book — the fallback will disappear automatically."
+      );
+      return;
+    }
     try {
       await setBookPopular(book.id, next);
       toast.success(
@@ -147,7 +161,7 @@ function PopularNow() {
             <div key={book.id} className={`${bookTileCard} relative`}>
               <Link to={`/book/${book.id}`} className="block min-w-0">
                 <img
-                  src={book.image}
+                  {...coverImgProps(book.image)}
                   alt={book.title}
                   className={bookTileImage}
                 />
@@ -198,13 +212,11 @@ function PopularNow() {
                   className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 text-left text-xs transition hover:border-[#D34F4E]/30 hover:bg-[#D34F4E]/5 sm:text-sm"
                 >
                   <div className="h-10 w-7 shrink-0 overflow-hidden rounded bg-gray-100">
-                    {b.image ? (
-                      // eslint-disable-next-line jsx-a11y/alt-text
-                      <img
-                        src={b.image}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : null}
+                    {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                    <img
+                      {...coverImgProps(b.image)}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-medium text-gray-800">

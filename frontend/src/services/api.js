@@ -111,7 +111,33 @@ export const getMe = (id) => API.get(`/users/${id}`);
 export const getUser = (id) => API.get(`/users/${id}`);
 
 // --- Admin: user management ---
-export const getAllUsers = () => API.get("/users");
+/**
+ * GET /users — admin-only. Optionally takes `{ q }` to do a server-side
+ * substring match on username/email. Always resolves with `res.data`
+ * normalised to an array; if upstream returns a string (e.g. a debug
+ * placeholder shadowed the route) we coerce to `[]` and log a warning
+ * so the bug is visible in the console immediately.
+ */
+export const getAllUsers = async (params = {}) => {
+  const cleanParams = Object.fromEntries(
+    Object.entries(params).filter(
+      ([, v]) => v !== undefined && v !== null && v !== ""
+    )
+  );
+  const res = await API.get("/users", {
+    params: Object.keys(cleanParams).length ? cleanParams : undefined,
+  });
+  if (Array.isArray(res.data)) return res;
+  if (res.data && Array.isArray(res.data.users)) {
+    return { ...res, data: res.data.users };
+  }
+  console.warn(
+    "[api] GET /users did not return an array — got:",
+    typeof res.data,
+    res.data
+  );
+  return { ...res, data: [] };
+};
 export const updateUserRole = (id, role) =>
   API.patch(`/users/${id}/role`, { role });
 export const updateUserStatus = (id, accountStatus) =>
@@ -154,6 +180,11 @@ export const getBooks = async (params = {}) => {
   if (payload && Array.isArray(payload.books)) {
     return { ...res, data: payload.books };
   }
+  console.warn(
+    "[api] GET /books did not return an array — got:",
+    typeof payload,
+    payload
+  );
   return { ...res, data: [] };
 };
 export const getBook = (id) => API.get(`/books/${id}`);

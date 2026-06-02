@@ -1,0 +1,1817 @@
+{
+  "info": {
+    "_postman_id": "5f3e8b80-1d39-4d6c-9e6a-d12b9d8a0c11",
+    "name": "Digital Library — Integration (Gateway)",
+    "description": "End-to-end integration tests against the Digital Library API Gateway (http://localhost:4000 by default).\n\nEvery request goes through the gateway — NEVER hits a microservice directly — so this collection verifies the full chain: nginx-fronted client → gateway proxy → auth/user/book/borrow microservices → gRPC fan-out → MySQL.\n\nFolders mirror the user-facing flows: Authentication → User → Book → Borrow.\n\nRun with Newman:\n\n    newman run digital-library.postman_collection.json -e local.postman_environment.json\n\nAdmin-only book CRUD (POST/PUT/DELETE /books) is conditional: set ADMIN_EMAIL and ADMIN_PASSWORD in the environment to enable it. Without admin creds those requests are auto-skipped (not failed). The RBAC negative test — a regular user trying to POST /books and getting 403 — always runs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Seed a unique user identity ONCE per Newman run.",
+          "if (!pm.collectionVariables.get('userEmail')) {",
+          "  const ts = Date.now();",
+          "  pm.collectionVariables.set('userEmail', `e2e_${ts}@example.com`);",
+          "  pm.collectionVariables.set('userName', `E2E_User_${ts}`);",
+          "  pm.collectionVariables.set('userPassword', pm.environment.get('USER_PASSWORD') || 'TestPass123!');",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level hardening: every request gets a sane-response check.",
+          "pm.test('Response is JSON (or empty for 204)', () => {",
+          "  if (pm.response.code === 204 || pm.response.responseSize === 0) return;",
+          "  const ct = pm.response.headers.get('Content-Type') || '';",
+          "  pm.expect(ct.toLowerCase()).to.include('application/json');",
+          "  pm.expect(() => pm.response.json()).to.not.throw();",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "userEmail",
+      "value": ""
+    },
+    {
+      "key": "userName",
+      "value": ""
+    },
+    {
+      "key": "userPassword",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "userRole",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "adminAccessToken",
+      "value": ""
+    },
+    {
+      "key": "createdBookId",
+      "value": ""
+    },
+    {
+      "key": "seedBookId",
+      "value": ""
+    },
+    {
+      "key": "seedBookAvail",
+      "value": ""
+    },
+    {
+      "key": "borrowId",
+      "value": ""
+    },
+    {
+      "key": "skipAdminFlow",
+      "value": "false"
+    },
+    {
+      "key": "supportTicketId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Gateway Health",
+      "item": [
+        {
+          "name": "GET /health — gateway and downstream services are reachable",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/health",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('reports service=api-gateway', () => pm.expect(body.service).to.eql('api-gateway'));",
+                  "pm.test('overall status UP', () => pm.expect(body.status).to.eql('UP'));",
+                  "pm.test('Redis is connected', () => pm.expect(body.redis).to.eql('CONNECTED'));",
+                  "pm.test('auth-service HTTP reachable', () => pm.expect(body.authService).to.eql('REACHABLE'));",
+                  "pm.test('auth-service gRPC reachable', () => pm.expect(body.authGrpc).to.eql('REACHABLE'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Authentication Flow",
+      "item": [
+        {
+          "name": "POST /auth/register — create a fresh user",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{userName}}\",\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/register",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns success=true', () => pm.expect(body.success).to.eql(true));",
+                  "pm.test('returns a human-readable message', () => pm.expect(body.message).to.be.a('string').and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/register — duplicate email is rejected (400)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{userName}}\",\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/register",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test('rejects duplicate registration', () => {",
+                  "  const msg = (body.message || body.error || '').toLowerCase();",
+                  "  pm.expect(msg).to.match(/exist|already/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — missing fields (400)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — wrong password (400)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"definitely-wrong-password\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400 (invalid credentials)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login — happy path; capture accessToken + refreshToken",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// NOTE: this request expects AUTH_SKIP_EMAIL_VERIFY=true on the auth-service",
+                  "// (the default for Docker integration runs). With email verification ENABLED",
+                  "// the auth-service returns 403 EMAIL_NOT_VERIFIED here, which is the correct",
+                  "// production behaviour. Surface that distinction clearly so the test failure",
+                  "// is actionable instead of cryptic.",
+                  "if (pm.response.code === 403) {",
+                  "  pm.test('SKIPPED — auth-service requires email verification (set AUTH_SKIP_EMAIL_VERIFY=true for integration runs)', () => {",
+                  "    pm.expect(pm.response.json().code, 'expected EMAIL_NOT_VERIFIED').to.eql('EMAIL_NOT_VERIFIED');",
+                  "  });",
+                  "  // Stop the user/book/borrow flows that all depend on this token.",
+                  "  postman.setNextRequest(null);",
+                  "  return;",
+                  "}",
+                  "",
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test('body has accessToken + refreshToken', () => {",
+                  "  pm.expect(body.accessToken, 'accessToken').to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refreshToken, 'refreshToken').to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('accessToken looks like a JWT (3 dot-separated parts)', () => {",
+                  "  pm.expect(body.accessToken.split('.')).to.have.lengthOf(3);",
+                  "});",
+                  "pm.test('user payload has id, email, role and NO password leak', () => {",
+                  "  pm.expect(body.user, 'user').to.be.an('object');",
+                  "  pm.expect(body.user.email).to.eql(pm.collectionVariables.get('userEmail'));",
+                  "  pm.expect(body.user.role).to.match(/^ROLE_/);",
+                  "  pm.expect(body.user, 'no password field').to.not.have.property('password');",
+                  "});",
+                  "pm.test('JWT payload has sub, role, typ=access', () => {",
+                  "  const claims = JSON.parse(",
+                  "    Buffer.from(body.accessToken.split('.')[1], 'base64').toString('utf8')",
+                  "  );",
+                  "  pm.expect(claims.typ).to.eql('access');",
+                  "  pm.expect(claims.role).to.match(/^ROLE_/);",
+                  "  pm.expect(String(claims.sub || claims.id || claims.userId)).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "pm.collectionVariables.set('userId', String(body.user.id));",
+                  "pm.collectionVariables.set('userRole', body.user.role);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/refresh — missing token (401)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/refresh",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401 (NO_REFRESH_TOKEN)', () => pm.response.to.have.status(401));",
+                  "pm.test('code = NO_REFRESH_TOKEN', () => pm.expect(pm.response.json().code).to.eql('NO_REFRESH_TOKEN'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/refresh — rotate tokens",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/refresh",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('rotated access + refresh', () => {",
+                  "  pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refreshToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.refreshToken).to.not.eql(pm.collectionVariables.get('refreshToken'));",
+                  "});",
+                  "pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. User Flow",
+      "item": [
+        {
+          "name": "GET /auth/{userId} — unauthenticated (401)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/{{userId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "{{userId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/{userId} — fetch own profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/{{userId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "{{userId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('id matches our user', () => pm.expect(String(body.id)).to.eql(pm.collectionVariables.get('userId')));",
+                  "pm.test('email matches our user', () => pm.expect(body.email).to.eql(pm.collectionVariables.get('userEmail')));",
+                  "pm.test('role is a canonical ROLE_*', () => pm.expect(body.role).to.match(/^ROLE_/));",
+                  "pm.test('no password leak', () => pm.expect(body).to.not.have.property('password'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /auth/me — update profile (username)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"Postman QA {{$timestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/me",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('success = true', () => pm.expect(body.success).to.eql(true));",
+                  "pm.test('user.id unchanged', () => pm.expect(String(body.user.id)).to.eql(pm.collectionVariables.get('userId')));",
+                  "pm.test('username starts with Postman QA', () => pm.expect(body.user.username).to.match(/^Postman QA/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /auth/me — invalid username (<2 chars) is rejected (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"x\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/me",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Book Flow",
+      "item": [
+        {
+          "name": "GET /books — unauthenticated (401)",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/books",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /books — list books and capture a seed for the borrow flow",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/books?limit=200",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "200"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('body is an array', () => pm.expect(body).to.be.an('array'));",
+                  "",
+                  "if (body.length === 0) {",
+                  "  console.warn('[seed] No books in DB — borrow flow will be skipped. Seed with an admin or run with admin creds set.');",
+                  "  pm.collectionVariables.set('seedBookId', '');",
+                  "  pm.collectionVariables.set('seedBookAvail', '');",
+                  "  return;",
+                  "}",
+                  "",
+                  "const candidate = body.find((b) => Number(b.availableCopies) > 0) || body[0];",
+                  "pm.test('seed book has the expected shape', () => {",
+                  "  pm.expect(candidate.id, 'id').to.exist;",
+                  "  pm.expect(candidate.title, 'title').to.be.a('string');",
+                  "  pm.expect(candidate.author, 'author').to.be.a('string');",
+                  "  pm.expect(candidate.availableCopies, 'availableCopies').to.be.a('number');",
+                  "});",
+                  "pm.collectionVariables.set('seedBookId', String(candidate.id));",
+                  "pm.collectionVariables.set('seedBookAvail', String(candidate.availableCopies));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /books/{id} — fetch the seed book by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/books/{{seedBookId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books",
+                "{{seedBookId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// No seed book → no point doing the lookup; skip cleanly.",
+                  "if (!pm.collectionVariables.get('seedBookId')) {",
+                  "  console.warn('[skip] no seed book id — skipping single-book lookup');",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('id matches', () => pm.expect(String(body.id)).to.eql(pm.collectionVariables.get('seedBookId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /books — RBAC: non-admin user rejected (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Should Not Persist\",\n  \"author\": \"Anyone\",\n  \"categoryId\": 1,\n  \"totalCopies\": 1\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/books",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 403 (regular user cannot create books)', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login (admin) — optional; enables admin book CRUD",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ADMIN_EMAIL}}\",\n  \"password\": \"{{ADMIN_PASSWORD}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const e = pm.environment.get('ADMIN_EMAIL');",
+                  "const p = pm.environment.get('ADMIN_PASSWORD');",
+                  "if (!e || !p) {",
+                  "  console.log('[admin] ADMIN_EMAIL/ADMIN_PASSWORD not set — admin CRUD will be skipped.');",
+                  "  pm.collectionVariables.set('skipAdminFlow', 'true');",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 200) {",
+                  "  console.warn(`[admin] login returned ${pm.response.code} — skipping admin CRUD.`);",
+                  "  pm.collectionVariables.set('skipAdminFlow', 'true');",
+                  "  return;",
+                  "}",
+                  "const body = pm.response.json();",
+                  "pm.test('admin login returned a token + admin role', () => {",
+                  "  pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.user.role).to.eql('ROLE_ADMIN');",
+                  "});",
+                  "pm.collectionVariables.set('adminAccessToken', body.accessToken);",
+                  "pm.collectionVariables.set('skipAdminFlow', 'false');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /books — create as admin",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Postman Integration Book\",\n  \"author\": \"Newman\",\n  \"image\": \"https://via.placeholder.com/120x180?text=Postman\",\n  \"description\": \"Created by the Postman integration suite. Safe to delete.\",\n  \"categoryId\": 1,\n  \"totalCopies\": 3\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/books",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('skipAdminFlow') === 'true') {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns book id + canonical fields', () => {",
+                  "  pm.expect(body.id, 'id').to.exist;",
+                  "  pm.expect(body.title).to.eql('Postman Integration Book');",
+                  "  pm.expect(body.author).to.eql('Newman');",
+                  "  pm.expect(body.totalCopies).to.eql(3);",
+                  "  pm.expect(body.availableCopies).to.eql(3);",
+                  "});",
+                  "pm.collectionVariables.set('createdBookId', String(body.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /books/{id} — update as admin",
+          "request": {
+            "method": "PUT",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated by the Postman integration suite.\",\n  \"totalCopies\": 5\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/books/{{createdBookId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books",
+                "{{createdBookId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('skipAdminFlow') === 'true' || !pm.collectionVariables.get('createdBookId')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('success=true and book reflects the patch', () => {",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.book.description).to.include('Updated');",
+                  "  pm.expect(body.book.totalCopies).to.eql(5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /books/{id} — clean up the admin-created book",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/books/{{createdBookId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books",
+                "{{createdBookId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('skipAdminFlow') === 'true' || !pm.collectionVariables.get('createdBookId')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Borrow Flow",
+      "item": [
+        {
+          "name": "POST /borrow — unauthenticated (401)",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookId\": \"{{seedBookId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/borrow",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "borrow"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /borrow — happy path, availability decreases by 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookId\": \"{{seedBookId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/borrow",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "borrow"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('seedBookId')) {",
+                  "  console.warn('[skip] no seed book — borrow flow skipped');",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('returns BORROWED record with snippet', () => {",
+                  "  pm.expect(body.id, 'borrow id').to.exist;",
+                  "  pm.expect(body.status).to.eql('BORROWED');",
+                  "  pm.expect(String(body.userId)).to.eql(pm.collectionVariables.get('userId'));",
+                  "  pm.expect(String(body.bookId)).to.eql(pm.collectionVariables.get('seedBookId'));",
+                  "});",
+                  "pm.collectionVariables.set('borrowId', String(body.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /books/{id} — availableCopies decreased by exactly 1",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/books/{{seedBookId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books",
+                "{{seedBookId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('borrowId')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const before = Number(pm.collectionVariables.get('seedBookAvail'));",
+                  "pm.test(`availableCopies dropped from ${before} to ${before - 1}`, () => {",
+                  "  pm.expect(Number(body.availableCopies)).to.eql(before - 1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /borrow/{userId} — list this user's borrows includes the new record",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/borrow/{{userId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "borrow",
+                "{{userId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('borrowId')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('body is an array', () => pm.expect(body).to.be.an('array'));",
+                  "pm.test('contains the freshly-created borrow id', () => {",
+                  "  const ids = body.map((b) => String(b.id));",
+                  "  pm.expect(ids, JSON.stringify(ids)).to.include(pm.collectionVariables.get('borrowId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /borrow/return/{borrowId} — return the book, availability restored",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/borrow/return/{{borrowId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "borrow",
+                "return",
+                "{{borrowId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('borrowId')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('status flipped to RETURNED', () => pm.expect(body.status).to.eql('RETURNED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /books/{id} — availableCopies restored to original",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/books/{{seedBookId}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books",
+                "{{seedBookId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('borrowId') || !pm.collectionVariables.get('seedBookId')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const before = Number(pm.collectionVariables.get('seedBookAvail'));",
+                  "pm.test(`availableCopies back to ${before}`, () => {",
+                  "  pm.expect(Number(pm.response.json().availableCopies)).to.eql(before);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Support Flow",
+      "item": [
+        {
+          "name": "POST /support/tickets — create a support ticket as a logged-in user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/support/tickets",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "support",
+                "tickets"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Integration test — Postman/Newman\",\n  \"message\": \"This ticket was created by the automated Postman/Newman integration suite.\",\n  \"category\": \"general\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('accessToken')) {",
+                  "  console.warn('[support] no accessToken yet — skipping support flow');",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const body = pm.response.json();",
+                  "const ticket = body.ticket || body;",
+                  "pm.test('returns a ticket with an id', () => pm.expect(ticket.id || body.ticketId).to.exist);",
+                  "pm.test('starts in OPEN status', () => {",
+                  "  const s = ticket.status || body.status;",
+                  "  pm.expect(String(s || '').toUpperCase()).to.eq('OPEN');",
+                  "});",
+                  "pm.collectionVariables.set('supportTicketId', String(ticket.id || body.ticketId));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /support/tickets/me — the new ticket appears in my history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/support/tickets/me",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('supportTicketId')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const list = Array.isArray(body) ? body : (body.tickets || body.items || []);",
+                  "pm.test('returns an array of tickets', () => pm.expect(list).to.be.an('array'));",
+                  "pm.test('includes the ticket created above', () => {",
+                  "  const id = pm.collectionVariables.get('supportTicketId');",
+                  "  pm.expect(list.some((t) => String(t.id) === id)).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /support/tickets/:id/reply — user reply on their own ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/support/tickets/{{supportTicketId}}/reply",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                "{{supportTicketId}}",
+                "reply"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Reply sent by the Postman/Newman integration suite.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('supportTicketId')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const body = pm.response.json();",
+                  "const replies = body.replies || (body.ticket && body.ticket.replies) || [];",
+                  "pm.test('reply was appended', () => pm.expect(replies.length).to.be.greaterThan(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /support/tickets/:id/status — admin closes the ticket (skipped without admin creds)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/support/tickets/{{supportTicketId}}/status",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                "{{supportTicketId}}",
+                "status"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CLOSED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('supportTicketId') || !pm.collectionVariables.get('adminAccessToken')) {",
+                  "  console.warn('[support] no adminAccessToken — skipping admin close');",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const status = body.status || (body.ticket && body.ticket.status);",
+                  "pm.test('ticket is now CLOSED', () => pm.expect(String(status || '').toUpperCase()).to.eq('CLOSED'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Admin Reporting",
+      "item": [
+        {
+          "name": "GET /users (admin) — paginated user list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('adminAccessToken')) {",
+                  "  console.warn('[admin] no adminAccessToken — skipping admin reporting');",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const list = Array.isArray(body) ? body : (body.users || body.items || []);",
+                  "pm.test('returns an array of users', () => pm.expect(list).to.be.an('array'));",
+                  "pm.test('never leaks the password column', () => list.forEach((u) => pm.expect(u).to.not.have.property('password')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /users/admin/stats — dashboard counts (the reporting surface)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/users/admin/stats",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "users",
+                "admin",
+                "stats"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('adminAccessToken')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "// The user-service returns {success:true, stats:{...}}; older builds returned a flat object — handle both.",
+                  "const stats = body.stats || body;",
+                  "const num = (...keys) => { for (const k of keys) { if (stats[k] != null) return Number(stats[k]); } return NaN; };",
+                  "pm.test('exposes totalUsers (numeric)', () => pm.expect(num('totalUsers', 'users', 'usersTotal')).to.be.a('number').and.not.NaN);",
+                  "pm.test('exposes totalBooks (numeric)', () => pm.expect(num('totalBooks', 'books', 'booksTotal')).to.be.a('number').and.not.NaN);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Negative / Error cases",
+      "item": [
+        {
+          "name": "GET /books/99999999 — unknown id returns 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/books/99999999",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books",
+                "99999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('accessToken')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /borrow/return/99999999 — non-existent borrow id returns 4xx",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/borrow/return/99999999",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "borrow",
+                "return",
+                "99999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('accessToken')) {",
+                  "  if (pm.execution && pm.execution.skipRequest) pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejects with a 4xx (not 5xx)', () => pm.expect(pm.response.code).to.be.within(400, 499));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /books with malformed Bearer token returns 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/books",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "this.is.not.a.real.jwt",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

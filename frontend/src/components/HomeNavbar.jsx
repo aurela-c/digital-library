@@ -12,6 +12,7 @@ import { books } from "../data/books";
 import { getBooks } from "../services/api";
 import { useIsAdmin } from "../utils/roles.js";
 import PageContainer from "./layout/PageContainer";
+import LogoutButton from "./LogoutButton.jsx";
 
 const categoryLinks = [
   "literature",
@@ -22,6 +23,63 @@ const categoryLinks = [
   "arts",
 ];
 
+/**
+ * Search input — declared OUTSIDE the `HomeNavbar` component on
+ * purpose. When it lived inside the parent's render body, every
+ * `setQuery` call (i.e. every keystroke) created a brand-new component
+ * reference, so React unmounted and remounted the `<input>` between
+ * each character and the focus jumped away. The user-visible symptom
+ * was: "I can only type one letter before I have to click the input
+ * again." Hoisting the component fixes that by giving React a stable
+ * type to reconcile against, which keeps the same DOM node — and the
+ * same focus — across renders.
+ */
+const SearchField = ({
+  compact = false,
+  query,
+  onQueryChange,
+  onSubmit,
+}) => (
+  <form
+    className="group relative w-full min-w-0"
+    onSubmit={onSubmit}
+    role="search"
+  >
+    <FaSearch
+      className={`pointer-events-none absolute top-1/2 z-[1] -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#D34F4E] ${
+        compact ? "left-3 text-xs" : "left-4 text-sm"
+      }`}
+      aria-hidden
+    />
+    <input
+      type="text"
+      enterKeyHint="search"
+      autoComplete="off"
+      placeholder={compact ? "Search…" : "Search by title or author…"}
+      value={query}
+      onChange={(e) => onQueryChange(e.target.value)}
+      className={
+        compact
+          ? "relative z-0 w-full rounded-xl border border-gray-200/80 bg-white py-2 pl-9 pr-11 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-[#D34F4E]/40 focus:ring-2 focus:ring-[#D34F4E]/15"
+          : "relative z-0 w-full rounded-2xl border border-gray-200/80 bg-white/90 py-2.5 pl-11 pr-24 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-[#D34F4E]/40 focus:bg-white focus:ring-4 focus:ring-[#D34F4E]/10"
+      }
+      aria-label="Search books"
+    />
+    <button
+      type="submit"
+      className={
+        compact
+          ? "absolute right-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg bg-[#D34F4E] text-white shadow-sm transition hover:bg-[#c04544] active:scale-95"
+          : "absolute right-1.5 top-1/2 z-10 flex h-8 -translate-y-1/2 items-center gap-1.5 rounded-xl bg-[#D34F4E] px-3.5 text-xs font-semibold text-white shadow-md shadow-[#D34F4E]/25 transition hover:bg-[#c04544] active:scale-[0.98]"
+      }
+      aria-label="Search"
+    >
+      <FaSearch className="text-[10px]" />
+      {!compact && <span className="hidden sm:inline">Search</span>}
+    </button>
+  </form>
+);
+
 const HomeNavbar = () => {
   const [query, setQuery] = useState("");
   const [catalog, setCatalog] = useState(books);
@@ -29,6 +87,13 @@ const HomeNavbar = () => {
   const [catOpen, setCatOpen] = useState(false);
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
+
+  // Only show the Log out entry when there is actually a session to end.
+  // Re-evaluated on every render (cheap localStorage read), so navigating
+  // away after logout naturally hides the button without extra plumbing.
+  const hasSession = Boolean(
+    typeof window !== "undefined" && localStorage.getItem("accessToken")
+  );
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -96,47 +161,6 @@ const HomeNavbar = () => {
   const desktopNavLink =
     "text-gray-700 hover:text-[#D34F4E] font-medium text-sm transition";
 
-  const SearchField = ({ compact = false }) => (
-    <form
-      className="group relative w-full min-w-0"
-      onSubmit={handleSearch}
-      role="search"
-    >
-      <FaSearch
-        className={`pointer-events-none absolute top-1/2 z-[1] -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-[#D34F4E] ${
-          compact ? "left-3 text-xs" : "left-4 text-sm"
-        }`}
-        aria-hidden
-      />
-      <input
-        type="text"
-        enterKeyHint="search"
-        autoComplete="off"
-        placeholder={compact ? "Search…" : "Search by title or author…"}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className={
-          compact
-            ? "relative z-0 w-full rounded-xl border border-gray-200/80 bg-white py-2 pl-9 pr-11 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-[#D34F4E]/40 focus:ring-2 focus:ring-[#D34F4E]/15"
-            : "relative z-0 w-full rounded-2xl border border-gray-200/80 bg-white/90 py-2.5 pl-11 pr-24 text-sm text-gray-800 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-[#D34F4E]/40 focus:bg-white focus:ring-4 focus:ring-[#D34F4E]/10"
-        }
-        aria-label="Search books"
-      />
-      <button
-        type="submit"
-        className={
-          compact
-            ? "absolute right-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg bg-[#D34F4E] text-white shadow-sm transition hover:bg-[#c04544] active:scale-95"
-            : "absolute right-1.5 top-1/2 z-10 flex h-8 -translate-y-1/2 items-center gap-1.5 rounded-xl bg-[#D34F4E] px-3.5 text-xs font-semibold text-white shadow-md shadow-[#D34F4E]/25 transition hover:bg-[#c04544] active:scale-[0.98]"
-        }
-        aria-label="Search"
-      >
-        <FaSearch className="text-[10px]" />
-        {!compact && <span className="hidden sm:inline">Search</span>}
-      </button>
-    </form>
-  );
-
   return (
     <nav className="sticky top-0 z-50 border-b border-gray-200/70 bg-[#f5efe9]/95 backdrop-blur-md">
       <PageContainer className="py-3">
@@ -152,7 +176,12 @@ const HomeNavbar = () => {
 
           {/* Mobile search — always beside logo, not in burger menu */}
           <div className="min-w-0 flex-1 md:hidden">
-            <SearchField compact />
+            <SearchField
+              compact
+              query={query}
+              onQueryChange={setQuery}
+              onSubmit={handleSearch}
+            />
           </div>
 
           {/* Desktop navigation */}
@@ -200,7 +229,11 @@ const HomeNavbar = () => {
 
           {/* Desktop search */}
           <div className="hidden max-w-lg flex-1 md:block">
-            <SearchField />
+            <SearchField
+              query={query}
+              onQueryChange={setQuery}
+              onSubmit={handleSearch}
+            />
           </div>
 
           {/* Profile icon — sends admins to the Admin Tools Panel (admins
@@ -294,6 +327,24 @@ const HomeNavbar = () => {
                 <Link to="/contact" onClick={closeMenu} className={navLink}>
                   Contact Us
                 </Link>
+              )}
+
+              {/* Log out — only shown when there's actually a session,
+                  so the navbar stays clean on any unauthenticated
+                  surface that ends up mounting it. Closes the burger
+                  menu before opening the confirm dialog so the
+                  modal isn't visually competing with the open menu. */}
+              {hasSession && (
+                <>
+                  <div className="my-1 h-px bg-gray-100" />
+                  <div className="px-2 pb-2 pt-1">
+                    <LogoutButton
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-[#D34F4E]/30 hover:bg-[#f5efe9] hover:text-[#D34F4E]"
+                      iconClassName="h-4 w-4"
+                      onAfterLogout={closeMenu}
+                    />
+                  </div>
+                </>
               )}
             </nav>
           </div>

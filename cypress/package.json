@@ -1,0 +1,15 @@
+{
+  "name": "digital-library-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cypress end-to-end tests for the Digital Library (drives the React UI through the gateway against the live Docker Compose stack).",
+  "scripts": {
+    "open": "cypress open",
+    "test": "cypress run",
+    "test:ci": "cypress run --reporter cypress-mochawesome-reporter"
+  },
+  "devDependencies": {
+    "cypress": "^13.17.0",
+    "cypress-mochawesome-reporter": "^3.8.4"
+  }
+}

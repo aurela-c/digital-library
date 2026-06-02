@@ -11,6 +11,7 @@ import {
   bookTileImage,
   bookTileTitle,
   bookTileAuthor,
+  coverImgProps,
 } from "../components/layout/BookCardStyles";
 import { createBook, deleteBook, getBooks, updateBook } from "../services/api";
 import { useIsAdmin } from "../utils/roles.js";
@@ -217,7 +218,7 @@ export default function CategoryBooks() {
                   className="shrink-0 w-36 sm:w-40 self-center sm:self-start"
                 >
                   <img
-                    src={professorBook.image}
+                    {...coverImgProps(professorBook.image)}
                     alt=""
                     className="w-full aspect-[2/3] object-cover rounded-lg shadow-lg hover:scale-105 transition"
                   />
@@ -293,7 +294,7 @@ export default function CategoryBooks() {
               <div key={book.id} className={`${bookTileCard} relative group`}>
                 <Link to={`/book/${book.id}`} className="block min-w-0">
                   <img
-                    src={book.image}
+                    {...coverImgProps(book.image)}
                     alt=""
                     className={bookTileImage}
                   />

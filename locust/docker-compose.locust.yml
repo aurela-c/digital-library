@@ -1,0 +1,86 @@
+# =============================================================================
+# Locust load-test overlay for the Digital Library stack.
+#
+# Run alongside the main stack (`microservices/docker-compose.yml`) by
+# joining its existing `microservices_app_net` bridge network — so the
+# master & workers reach the gateway via docker DNS (`gateway:4000`)
+# and bypass the host's IPv4/IPv6 routing entirely.
+#
+# Typical use (from the repo root):
+#
+#   # 1. Bring the app stack up if it's not already running
+#   docker compose -f microservices/docker-compose.yml up -d
+#
+#   # 2. Apply the load-test rate-limit override + spin up locust
+#   docker compose -f microservices/docker-compose.yml -f locust/docker-compose.locust.yml up -d --scale locust-worker=4
+#
+#   # 3. Open the locust UI
+#   #    http://localhost:8089
+#
+# The `gateway` service is RE-DECLARED below with the relaxed
+# GATEWAY_RATE_LIMIT_* env vars so we don't have to edit the source
+# compose file; docker merges per-service env and keeps everything else.
+# =============================================================================
+
+networks:
+  default:
+    # Re-use the main stack's bridge network so we have direct service-name
+    # access (`gateway:4000`) without re-publishing ports.
+    name: microservices_app_net
+    external: true
+
+services:
+  # Override only the env vars we care about for the run. Image, ports,
+  # depends_on, etc. are inherited from microservices/docker-compose.yml.
+  gateway:
+    environment:
+      # 600 000 requests / 60 000 ms == 10 000 rps headroom. Plenty for
+      # a 1000-VU stress run + the trickle from the dashboard / health
+      # checks. The default (100 / minute) is preserved automatically
+      # whenever this overlay isn't applied.
+      GATEWAY_RATE_LIMIT_MAX: "${GATEWAY_RATE_LIMIT_MAX:-600000}"
+      GATEWAY_RATE_LIMIT_WINDOW_MS: "${GATEWAY_RATE_LIMIT_WINDOW_MS:-60000}"
+
+  locust-master:
+    # NB: build & volume paths are written as `../locust` because
+    # Docker Compose resolves relative paths against the FIRST `-f`
+    # file's directory (`microservices/`), not each file's own dir.
+    # Tested with `docker compose ... config` to confirm the paths
+    # collapse to the real locust/ directory.
+    build:
+      context: ../locust
+      dockerfile: Dockerfile
+    image: digital-library-locust:latest
+    command:
+      - --master
+      - -f
+      - /mnt/locust/locustfile.py
+      - --host=${LOCUST_HOST:-http://gateway:4000}
+      - --web-host=0.0.0.0
+    environment:
+      LOCUST_USER_EMAIL: "${LOCUST_USER_EMAIL:-aurelacocaj1@gmail.com}"
+      LOCUST_USER_PASSWORD: "${LOCUST_USER_PASSWORD:-ela12345}"
+      LOCUST_ADMIN_EMAIL: "${LOCUST_ADMIN_EMAIL:-admin@library.com}"
+      LOCUST_ADMIN_PASSWORD: "${LOCUST_ADMIN_PASSWORD:-admin123}"
+    volumes:
+      - ../locust:/mnt/locust
+    ports:
+      - "8089:8089"
+
+  locust-worker:
+    image: digital-library-locust:latest
+    # Make sure the master image is built before workers start.
+    depends_on:
+      - locust-master
+    command:
+      - --worker
+      - -f
+      - /mnt/locust/locustfile.py
+      - --master-host=locust-master
+    environment:
+      LOCUST_USER_EMAIL: "${LOCUST_USER_EMAIL:-aurelacocaj1@gmail.com}"
+      LOCUST_USER_PASSWORD: "${LOCUST_USER_PASSWORD:-ela12345}"
+      LOCUST_ADMIN_EMAIL: "${LOCUST_ADMIN_EMAIL:-admin@library.com}"
+      LOCUST_ADMIN_PASSWORD: "${LOCUST_ADMIN_PASSWORD:-admin123}"
+    volumes:
+      - ../locust:/mnt/locust

@@ -1,6 +1,23 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    monitor: "digital-library"
+
+# ---------------------------------------------------------------------------
+# In the full-Docker stack every Node service runs inside the `app_net`
+# bridge network and is reachable from Prometheus by its compose service
+# name. No `host.docker.internal` is required.
+#
+# Each service applies a `service=<name>` default label inside the app
+# (`observability/metricsBundle.js`), so there are no per-target `labels:`
+# blocks here (they would clash and produce `exported_service`).
+#
+# If you ever run a service on the HOST for hot-reload while the rest of
+# the stack stays containerised, swap the relevant target back to
+# `host.docker.internal:<port>` — the prometheus container already has
+# the `extra_hosts: host-gateway` mapping for that case.
+# ---------------------------------------------------------------------------
 
 scrape_configs:
   - job_name: "api-gateway"
@@ -27,3 +44,11 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets: ["borrow-service:5004"]
+
+  # Self-scrape — surfaces prometheus_* internals and `up{job="prometheus"}`
+  # in Grafana so the dashboard's "Service uptime" panel works for the
+  # monitoring tier too.
+  - job_name: "prometheus"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["localhost:9090"]

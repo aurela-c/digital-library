@@ -29,7 +29,13 @@ const toBookResponse = (b) => ({
 export const GetAllBooks = async (call, callback) => {
   try {
     const page = parseInt(call.request.page) || 1;
-    const limit = parseInt(call.request.limit) || 10;
+    // Default to a high cap so unparameterised callers (admin dashboard,
+    // category pages, homepage carousel, navbar search index) receive the
+    // full catalog in a single request. Real consumers that need
+    // pagination pass an explicit `limit` (and `page`); they keep working
+    // unchanged. The previous default of 10 silently hid most of the
+    // catalog from every screen that lists books.
+    const limit = parseInt(call.request.limit) || 1000;
     const offset = (page - 1) * limit;
 
     const { categoryId, author, title } = call.request;

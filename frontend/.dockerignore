@@ -1,0 +1,28 @@
+# Frontend build-context excludes.
+
+node_modules
+dist
+build
+.cache
+
+# Vite leaves these in the working tree but they're worthless inside the image.
+.vite
+
+# Local-dev env. Production gateway target is injected via build-arg in
+# the Dockerfile (see VITE_GATEWAY_TARGET).
+.env
+.env.*
+!.env.example
+
+# VCS / IDE / OS
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Docs / GH metadata
+README.md
+CHANGELOG.md
+.github

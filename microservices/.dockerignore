@@ -1,0 +1,31 @@
+# Build-context excludes shared across every microservice Dockerfile.
+# Keeps secrets out of the image and shrinks the upload to the daemon.
+
+# Per-service installs run inside the image — never copy host-side modules.
+**/node_modules
+
+# Secrets / local-dev config (compose injects production env vars instead).
+**/.env
+**/.env.*
+!**/.env.example
+
+# VCS / IDE / OS
+.git
+.gitignore
+**/.vscode
+**/.idea
+**/.DS_Store
+**/Thumbs.db
+
+# Test + tooling artefacts not needed at runtime.
+**/coverage
+**/dist
+**/build
+**/*.log
+**/npm-debug.log*
+**/.cache
+
+# Docs / GH metadata
+**/README.md
+**/CHANGELOG.md
+.github

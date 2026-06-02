@@ -1,0 +1,123 @@
+# nginx site config used by the frontend container.
+#
+# Two responsibilities:
+#   1. Serve the Vite-built SPA from /usr/share/nginx/html, with the
+#      `try_files ... /index.html` fallback so React Router deep-links
+#      (`/events/3`, `/profile`, etc.) resolve to the SPA instead of 404.
+#   2. Reverse-proxy every backend API prefix to the api-gateway service
+#      over the private container network. The browser only ever sees this
+#      nginx origin (`http://localhost` locally, the Railway public URL in
+#      production), so there are no cross-origin requests and the
+#      gateway's CORS config is effectively bypassed.
+#
+# ENV-DRIVEN: this file is a template. The nginx:alpine entrypoint
+# substitutes the three variables below via envsubst before nginx starts
+# (see `frontend/Dockerfile` for the ENV defaults).
+#
+#   ${PORT}          public listen port            (Docker Compose: 80
+#                                                   Railway:        $PORT injected)
+#   ${GATEWAY_HOST}  gateway DNS name              (Docker Compose: gateway
+#                                                   Railway:        gateway.railway.internal)
+#   ${GATEWAY_PORT}  gateway HTTP port             (always 4000)
+#
+# Only those three names are substituted — see NGINX_ENVSUBST_FILTER in
+# the Dockerfile — so nginx's own variables ($host, $remote_addr, ...)
+# pass through untouched.
+
+upstream digital_library_gateway {
+  server ${GATEWAY_HOST}:${GATEWAY_PORT};
+}
+
+# Map block lets us set the X-Forwarded-Proto value once.
+map $http_x_forwarded_proto $forwarded_proto {
+  default $scheme;
+  ~.+     $http_x_forwarded_proto;
+}
+
+server {
+  listen ${PORT};
+  listen [::]:${PORT};
+  server_name _;
+
+  # Bump up for future file uploads / large JSON payloads.
+  client_max_body_size 10m;
+
+  # ---------------------------------------------------------------------
+  # Default proxy headers — inherited by every `location` that doesn't
+  # override them. Keeps the per-location blocks readable.
+  # ---------------------------------------------------------------------
+  proxy_http_version 1.1;
+  proxy_set_header   Host              $host;
+  proxy_set_header   X-Real-IP         $remote_addr;
+  proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+  proxy_set_header   X-Forwarded-Proto $forwarded_proto;
+  proxy_set_header   X-Forwarded-Host  $host;
+  proxy_set_header   Upgrade           $http_upgrade;
+  proxy_set_header   Connection        "";
+  proxy_read_timeout 60s;
+  proxy_send_timeout 60s;
+
+  # Don't cache index.html so users pick up new bundle hashes immediately
+  # after a deploy. Hashed JS/CSS chunks are still cached aggressively
+  # below.
+  location = /index.html {
+    add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+    root /usr/share/nginx/html;
+    try_files /index.html =404;
+  }
+
+  # ---------------------------------------------------------------------
+  # Backend API proxies. These prefixes are matched BEFORE the SPA
+  # fallback so they reach the gateway, not index.html.
+  # ---------------------------------------------------------------------
+
+  # Vite-style alias kept for compatibility with the dev proxy config.
+  location /api/auth/ {
+    proxy_pass http://digital_library_gateway;
+  }
+
+  location /auth/ {
+    proxy_pass http://digital_library_gateway;
+  }
+
+  location /users {
+    proxy_pass http://digital_library_gateway;
+  }
+
+  location /books {
+    proxy_pass http://digital_library_gateway;
+  }
+
+  location /borrow {
+    proxy_pass http://digital_library_gateway;
+  }
+
+  location /support {
+    proxy_pass http://digital_library_gateway;
+  }
+
+  # Forward /health straight through so external uptime checks hitting
+  # the SPA host transparently validate the gateway.
+  location = /health {
+    proxy_pass http://digital_library_gateway/health;
+  }
+
+  # ---------------------------------------------------------------------
+  # Static assets — cache hashed chunks for a year.
+  # ---------------------------------------------------------------------
+  location ~* \.(?:js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|webp|ico|mp4)$ {
+    root /usr/share/nginx/html;
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    try_files $uri =404;
+  }
+
+  # ---------------------------------------------------------------------
+  # SPA fallback — anything else returns index.html so React Router can
+  # handle the route in the browser.
+  # ---------------------------------------------------------------------
+  location / {
+    root /usr/share/nginx/html;
+    try_files $uri $uri/ /index.html;
+  }
+}

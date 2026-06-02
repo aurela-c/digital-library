@@ -76,10 +76,74 @@ app.get("/", (req, res) => {
 app.use(notFoundHandler);
 app.use(createErrorHandler(logger));
 
+/**
+ * Idempotent schema-healing migration.
+ *
+ * The `users` table was originally created with a subset of the columns
+ * the Sequelize User model declares. Any missing column (e.g.
+ * `verification_token`, `reset_password_token`, `reset_password_expires`,
+ * `profile_image`, `account_status`) makes Sequelize's auto-generated
+ * `SELECT * FROM users` fail at request time with a cryptic "Unknown
+ * column" 5xx — which is exactly what blocks /auth/register, /auth/login,
+ * and every downstream flow.
+ *
+ * Each ADD COLUMN is wrapped in its own try/catch and the resulting
+ * error is ignored when MySQL reports "Duplicate column name" (ER_DUP_FIELDNAME),
+ * so this function is safe to call on every startup against any
+ * schema state.
+ */
+const ensureUserSchemaUpToDate = async () => {
+  const qi = sequelize.getQueryInterface();
+  const dialect = sequelize.getDialect();
+
+  const wantedColumns = [
+    { name: "verification_token", ddl: "VARCHAR(512) NULL" },
+    { name: "reset_password_token", ddl: "VARCHAR(255) NULL" },
+    { name: "reset_password_expires", ddl: "DATETIME NULL" },
+    { name: "profile_image", ddl: "VARCHAR(255) NULL" },
+    { name: "account_status", ddl: "VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'" },
+    { name: "is_verified", ddl: "TINYINT(1) NULL DEFAULT 0" },
+  ];
+
+  let existing = new Set();
+  try {
+    const desc = await qi.describeTable("users");
+    existing = new Set(Object.keys(desc || {}));
+  } catch (err) {
+    logger.warn(
+      `ensureUserSchemaUpToDate: describeTable failed (${err.message}); will attempt ADDs anyway`
+    );
+  }
+
+  for (const col of wantedColumns) {
+    if (existing.has(col.name)) continue;
+    try {
+      await sequelize.query(`ALTER TABLE users ADD COLUMN ${col.name} ${col.ddl}`);
+      logger.info(`ensureUserSchemaUpToDate: added column users.${col.name}`);
+    } catch (err) {
+      const msg = String(err?.original?.message || err?.message || "");
+      if (/Duplicate column name/i.test(msg)) continue;
+      logger.warn(
+        `ensureUserSchemaUpToDate: could not add users.${col.name} (${msg}); continuing`
+      );
+    }
+  }
+
+  if (dialect !== "mysql") {
+    // Only MySQL/MariaDB tested; other dialects keep working but skip the
+    // explicit ALTER pass — Sequelize sync would handle them on its own.
+    return;
+  }
+};
+
 const start = async () => {
   try {
     await sequelize.authenticate();
     logger.info("Database connected (users table — no ORM sync)");
+
+    // Self-heal the schema BEFORE the first request lands. Safe to run
+    // every startup; no-op once every column is present.
+    await ensureUserSchemaUpToDate();
 
     // Probe SMTP at startup so missing/invalid credentials are visible
     // immediately, not after the first registration attempt.
@@ -95,8 +159,12 @@ const start = async () => {
 
     const httpPort = Number(process.env.PORT) || 5001;
 
-    app.listen(httpPort, () => {
-      logger.info(`HTTP listening on port ${httpPort}`);
+    // Explicit 0.0.0.0 bind so the process is reachable from the
+    // container network. Node defaults to dual-stack on Linux but this
+    // makes the intent obvious and is required by the docker compose
+    // health/scrape model.
+    app.listen(httpPort, "0.0.0.0", () => {
+      logger.info(`HTTP listening on 0.0.0.0:${httpPort}`);
       printExpressStack(app, "auth-service");
 
       setTimeout(() => {

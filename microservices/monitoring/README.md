@@ -11,34 +11,47 @@ This stack uses **Prometheus** (metrics), **Grafana** (dashboards), **Pino JSON 
 - **API gateway** forwards `X-Request-Id` to the auth service for trace continuity.
 - **Structured logs** — one JSON line per HTTP access (`msg: http_access`) and per error (`msg: http_error`); ship to **Grafana Loki** or **ELK** with your log agent (Docker logging driver, Promtail, Filebeat, etc.).
 
-## Run with Docker Compose
+## Full stack — one command
 
-From `microservices/`:
+The `docker-compose.yml` at the parent directory bundles MySQL, Redis,
+RabbitMQ, all five Node services, the React frontend, Prometheus, and
+Grafana. From a fresh checkout:
 
 ```bash
+cd microservices
+cp .env.example .env          # then edit EMAIL_APP_PASSWORD etc.
 docker compose up --build
 ```
 
-- **Grafana**: http://localhost:3000 (default `admin` / `admin` — change in production).
-- **Prometheus**: http://localhost:9090
-- **Gateway metrics**: http://localhost:4000/metrics
-- **Per-service metrics**: ports `5001`–`5004` `/metrics`
+Wait until `docker compose ps` shows every service `running` / `healthy`,
+then open:
 
-## Local development (without Docker)
+- **Frontend** — http://localhost
+- **Gateway** — http://localhost:4000
+- **Prometheus** — http://localhost:9090/targets (all 6 jobs must read **UP**)
+- **Grafana** — http://localhost:3000 (default `admin` / `admin`; the
+  “HTTP / API overview” dashboard is the auto-provisioned home)
+- **RabbitMQ management UI** — http://localhost:15672 (default `guest` / `guest`)
+- **Per-service `/metrics`** — http://localhost:4000/metrics and
+  `http://localhost:5001..5004/metrics`
 
-Install shared observability dependencies once (so `pino` / `prom-client` resolve from `microservices/observability/`):
+### Scrape topology
 
-```bash
-cd microservices/observability && npm install
-```
+Every Node service runs inside the `app_net` bridge network, so
+Prometheus reaches them by their compose service names
+(`gateway:4000`, `auth-service:5001`, …). Service labels (`service=<name>`)
+are applied inside the Node process by `observability/metricsBundle.js`,
+so the scrape config carries no per-target labels (those would clash and
+get renamed `exported_service`).
 
-Then run each service from its folder; imports resolve `../observability`:
+### Run only the monitoring tier
 
-```bash
-cd microservices/auth-service && npm install && node index.js
-```
-
-Each service still has its own `npm install` for service-specific packages.
+If you're iterating on a single service on the host (for hot-reload) and
+want the rest of the stack containerised, the prometheus container
+already maps `host.docker.internal:host-gateway`, so you can flip a
+target back to `host.docker.internal:<port>` in `prometheus.yml`,
+reload (`curl -X POST http://localhost:9090/-/reload`), and the host
+process becomes scrapable while everything else still runs in compose.
 
 ## Environment
 

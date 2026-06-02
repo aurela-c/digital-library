@@ -7,7 +7,6 @@ import {
   FiGrid,
   FiMenu,
   FiX,
-  FiLogOut,
   FiLifeBuoy,
   FiSend,
   FiRefreshCw,
@@ -39,6 +38,8 @@ import {
   categoryById,
   labelForCategory,
 } from "../utils/categories.js";
+import { coverImgProps } from "../components/layout/BookCardStyles.js";
+import LogoutButton from "../components/LogoutButton.jsx";
 
 const asList = (data, nestedKey) => {
   if (Array.isArray(data)) return data;
@@ -101,7 +102,10 @@ const fmtDateTime = (v) => {
 };
 
 const AdminDashboard = () => {
-  const { user: currentUser, logout } = useContext(AuthContext);
+  // We deliberately only consume `user` here — the actual logout flow
+  // (confirm dialog + navigate to /login) lives inside LogoutButton so
+  // every entry point in the app behaves identically.
+  const { user: currentUser } = useContext(AuthContext);
   const [section, setSection] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -115,11 +119,45 @@ const AdminDashboard = () => {
   });
   const [error, setError] = useState(null);
 
-  const loadUsers = useCallback(async () => {
+  const loadUsers = useCallback(async (params = {}) => {
     setLoading((s) => ({ ...s, users: true }));
     try {
-      const res = await getAllUsers();
-      setUsers(asList(res.data, "users"));
+      const res = await getAllUsers(params);
+      const list = asList(res.data, "users");
+      // Surface the role / accountStatus distribution in DevTools so
+      // future schema drift (e.g. the ENUM-vs-VARCHAR bug we fixed in
+      // the user-service migration) is spotted on the very first load
+      // instead of after the admin reports broken UI.
+      if (list.length > 0) {
+        const roles = list.reduce((acc, u) => {
+          const k = String(u.role || "<empty>");
+          acc[k] = (acc[k] || 0) + 1;
+          return acc;
+        }, {});
+        const statuses = list.reduce((acc, u) => {
+          const k = String(u.accountStatus || "<empty>").toUpperCase();
+          acc[k] = (acc[k] || 0) + 1;
+          return acc;
+        }, {});
+        console.debug(
+          "[admin] users loaded",
+          { total: list.length, roles, statuses }
+        );
+        // Loud warning if the DB columns still contain pre-migration
+        // truncated values — proves whether the user-service migration
+        // ran. Empty string == ENUM rejected the canonical write.
+        if (roles[""] || roles["<empty>"]) {
+          console.warn(
+            "[admin] some users have an empty `role` field — run the user-service migration"
+          );
+        }
+        if (statuses[""] || statuses["<empty>"]) {
+          console.warn(
+            "[admin] some users have an empty `accountStatus` field — run the user-service migration"
+          );
+        }
+      }
+      setUsers(list);
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.error || err.message;
       setError(msg);
@@ -192,7 +230,6 @@ const AdminDashboard = () => {
           section={section}
           setSection={setSection}
           currentUser={currentUser}
-          onLogout={logout}
           mobileOpen={sidebarOpen}
           onCloseMobile={() => setSidebarOpen(false)}
         />
@@ -221,14 +258,24 @@ const AdminDashboard = () => {
               users={users}
               loading={loading.users}
               currentUserId={currentUser?.id}
-              onReload={() => {
-                loadUsers();
+              onReload={(params) => {
+                // `params` is optional — UsersSection passes
+                // `{ q: <current search string> }` so the Refresh button
+                // doubles as a "search the database" action. Empty
+                // params just reloads everything.
+                loadUsers(params || {});
                 loadStats();
               }}
               onChangeRole={async (id, role) => {
                 try {
                   const res = await updateUserRole(id, role);
-                  toast.success(res.data?.message || "Role updated");
+                  // The backend message describes WHEN the change takes
+                  // effect ("on next sign-in / within ~1h on token
+                  // refresh"). Use a longer-lived toast so the admin
+                  // actually reads it instead of dismissing reflexively.
+                  toast.success(res.data?.message || "Role updated", {
+                    autoClose: 6000,
+                  });
                   await loadUsers();
                   await loadStats();
                 } catch (err) {
@@ -242,7 +289,13 @@ const AdminDashboard = () => {
               onChangeStatus={async (id, accountStatus) => {
                 try {
                   const res = await updateUserStatus(id, accountStatus);
-                  toast.success(res.data?.message || "Status updated");
+                  // BANNED/INACTIVE messages explain that the live
+                  // access token still works for up to one TTL — admin
+                  // needs that context, so we keep the toast on screen
+                  // a little longer than the default.
+                  toast.success(res.data?.message || "Status updated", {
+                    autoClose: 6000,
+                  });
                   await loadUsers();
                   await loadStats();
                 } catch (err) {
@@ -295,7 +348,6 @@ const Sidebar = ({
   section,
   setSection,
   currentUser,
-  onLogout,
   mobileOpen,
   onCloseMobile,
 }) => {
@@ -353,14 +405,10 @@ const Sidebar = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <FiLogOut className="h-4 w-4" />
-            Sign out
-          </button>
+          <LogoutButton
+            className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+            iconClassName="h-4 w-4"
+          />
         </div>
       </aside>
 
@@ -386,14 +434,10 @@ const Sidebar = ({
             </div>
             {NavList}
             <div className="mt-auto border-t border-gray-100 px-4 py-4">
-              <button
-                type="button"
-                onClick={onLogout}
-                className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-              >
-                <FiLogOut className="h-4 w-4" />
-                Sign out
-              </button>
+              <LogoutButton
+                className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+                iconClassName="h-4 w-4"
+              />
             </div>
           </aside>
         </div>
@@ -431,8 +475,10 @@ const PageHeader = ({ section }) => {
 
 
 const OverviewSection = ({ users, books, stats, loading }) => {
-  // Use real backend stats when available; fall back to client-side
-  // aggregation if the stats endpoint is unreachable.
+  // Prefer DB-authoritative counts from the user-service stats endpoint
+  // (`/users/admin/stats`). Fall back to client-side aggregation only if
+  // that endpoint is unreachable, so the dashboard still shows *something*
+  // useful even when the stats request fails.
   const totalUsers = stats?.totalUsers ?? users.length;
   const activeUsers =
     stats?.activeUsers ??
@@ -442,15 +488,20 @@ const OverviewSection = ({ users, books, stats, loading }) => {
   const totalTickets = stats?.totalTickets ?? null;
   const openTickets = stats?.openTickets ?? null;
 
-  const totalBooks = books.length;
-  const totalCategories = new Set(
-    books
-      .map((b) => Number(b.categoryId ?? b.category_id))
-      .filter((c) => Number.isFinite(c))
-  ).size;
+  // Book + category totals — the backend now reports both via raw COUNT()
+  // against the books table, which is correct even when the catalog has
+  // more rows than the frontend chose to download.
+  const totalBooks = stats?.totalBooks ?? books.length;
+  const totalCategories =
+    stats?.totalCategories ??
+    new Set(
+      books
+        .map((b) => Number(b.categoryId ?? b.category_id))
+        .filter((c) => Number.isFinite(c))
+    ).size;
 
   const loadingUsers = loading.users || loading.stats;
-  const loadingBooks = loading.books;
+  const loadingBooks = loading.books || loading.stats;
 
   return (
     <section className="space-y-6">
@@ -477,18 +528,6 @@ const OverviewSection = ({ users, books, stats, loading }) => {
               : null
           }
         />
-      </div>
-
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-gray-800">
-          Data sources
-        </h2>
-        <p className="mt-1 text-xs text-gray-500">
-          Numbers above come from live queries against the production
-          database. Users, tickets and per-status counts are aggregated by
-          the user-service. Book and category totals are computed from the
-          books catalog returned by the book-service.
-        </p>
       </div>
     </section>
   );
@@ -573,7 +612,18 @@ const UsersSection = ({
         </select>
         <button
           type="button"
-          onClick={onReload}
+          // If the admin has typed a search term, re-fetch from the DB
+          // with that term as a server-side filter. This is belt-and-
+          // braces: client-side filtering on the already-loaded `users`
+          // array is the primary path and works for moderate catalogs.
+          // The server filter exists so very large user tables still
+          // return relevant matches even if the local cache is partial.
+          onClick={() => onReload(query.trim() ? { q: query.trim() } : {})}
+          title={
+            query.trim()
+              ? `Refresh from DB with search "${query.trim()}"`
+              : "Refresh from DB"
+          }
           className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           Refresh
@@ -1012,13 +1062,11 @@ const BooksSection = ({ books, loading, onReload }) => {
                     <td className="px-3 py-3 sm:px-4">
                       <div className="flex items-center gap-3">
                         <div className="h-12 w-9 shrink-0 overflow-hidden rounded bg-gray-100">
-                          {b.image ? (
-                            // eslint-disable-next-line jsx-a11y/alt-text
-                            <img
-                              src={b.image}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : null}
+                          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                          <img
+                            {...coverImgProps(b.image)}
+                            className="h-full w-full object-cover"
+                          />
                         </div>
                         <div className="min-w-0">
                           <p className="truncate font-medium text-gray-900">
@@ -1209,18 +1257,27 @@ const BookEditorModal = ({ mode, book, onCancel, onSave }) => {
             </FormField>
             <FormField
               label="Cover image"
-              hint="Relative path like /images/book.jpg, a full https URL, or leave blank."
+              hint="Relative path like /images/book1.jpg, a full https URL, or leave blank. Files must exist in frontend/public/images/. Preview below shows what users will see — broken paths fall back to a default cover automatically."
             >
-              <input
-                // Plain text — `type=url` would HTML5-block relative
-                // paths like /images/book.jpg before the form submits.
-                type="text"
-                maxLength={512}
-                placeholder="/images/book.jpg or https://…"
-                value={form.image}
-                onChange={setField("image")}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
+              <div className="flex items-start gap-3">
+                <input
+                  // Plain text — `type=url` would HTML5-block relative
+                  // paths like /images/book1.jpg before the form submits.
+                  type="text"
+                  maxLength={512}
+                  placeholder="/images/book1.jpg or https://…"
+                  value={form.image}
+                  onChange={setField("image")}
+                  className="w-full flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+                <div className="h-16 w-12 shrink-0 overflow-hidden rounded border border-gray-200 bg-gray-50">
+                  {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                  <img
+                    {...coverImgProps(form.image)}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </div>
             </FormField>
             <FormField label="Total copies" required>
               <input

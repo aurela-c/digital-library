@@ -1,0 +1,7 @@
+node_modules/
+reports/screenshots/
+reports/videos/
+reports/downloads/
+reports/.jsons/
+reports/html/assets/
+reports/html/digital-library-e2e.html

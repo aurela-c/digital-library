@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="Digital Library — Integration (Gateway)" tests="35" time="1.130">
+  <testsuite name="0. Gateway Health / GET /health — gateway and downstream services are reachable" id="0ab9d14e-1e92-4a51-a8b5-a5676abc3e7b" timestamp="2026-06-02T19:42:41.945Z" tests="7" failures="0" errors="0" time="0.051">
+    <testcase name="Response is JSON (or empty for 204)" time="0.051" classname="0GatewayHealthGetHealthGatewayAndDownstreamServicesAreReachable"/>
+    <testcase name="status 200" time="0.051" classname="0GatewayHealthGetHealthGatewayAndDownstreamServicesAreReachable"/>
+    <testcase name="reports service=api-gateway" time="0.051" classname="0GatewayHealthGetHealthGatewayAndDownstreamServicesAreReachable"/>
+    <testcase name="overall status UP" time="0.051" classname="0GatewayHealthGetHealthGatewayAndDownstreamServicesAreReachable"/>
+    <testcase name="Redis is connected" time="0.051" classname="0GatewayHealthGetHealthGatewayAndDownstreamServicesAreReachable"/>
+    <testcase name="auth-service HTTP reachable" time="0.051" classname="0GatewayHealthGetHealthGatewayAndDownstreamServicesAreReachable"/>
+    <testcase name="auth-service gRPC reachable" time="0.051" classname="0GatewayHealthGetHealthGatewayAndDownstreamServicesAreReachable"/>
+  </testsuite>
+  <testsuite name="1. Authentication Flow / POST /auth/register — create a fresh user" id="e1caf829-79dc-4b92-84fa-0b6486f140ac" timestamp="2026-06-02T19:42:41.945Z" tests="4" failures="0" errors="0" time="0.095">
+    <testcase name="Response is JSON (or empty for 204)" time="0.095" classname="1AuthenticationFlowPostAuthRegisterCreateAFreshUser"/>
+    <testcase name="status 201" time="0.095" classname="1AuthenticationFlowPostAuthRegisterCreateAFreshUser"/>
+    <testcase name="returns success=true" time="0.095" classname="1AuthenticationFlowPostAuthRegisterCreateAFreshUser"/>
+    <testcase name="returns a human-readable message" time="0.095" classname="1AuthenticationFlowPostAuthRegisterCreateAFreshUser"/>
+  </testsuite>
+  <testsuite name="1. Authentication Flow / POST /auth/register — duplicate email is rejected (400)" id="bb5b2db8-1fec-4c0f-8a79-66f1a0c8561c" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.014">
+    <testcase name="Response is JSON (or empty for 204)" time="0.014" classname="1AuthenticationFlowPostAuthRegisterDuplicateEmailIsRejected400"/>
+    <testcase name="status 400" time="0.014" classname="1AuthenticationFlowPostAuthRegisterDuplicateEmailIsRejected400"/>
+    <testcase name="rejects duplicate registration" time="0.014" classname="1AuthenticationFlowPostAuthRegisterDuplicateEmailIsRejected400"/>
+  </testsuite>
+  <testsuite name="1. Authentication Flow / POST /auth/login — missing fields (400)" id="5fc1a772-ded4-40a9-9570-5608ebc297dd" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.007">
+    <testcase name="Response is JSON (or empty for 204)" time="0.007" classname="1AuthenticationFlowPostAuthLoginMissingFields400"/>
+    <testcase name="status 400" time="0.007" classname="1AuthenticationFlowPostAuthLoginMissingFields400"/>
+  </testsuite>
+  <testsuite name="1. Authentication Flow / POST /auth/login — wrong password (400)" id="3e8772da-5eb7-48b3-9655-8497c39aad47" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.074">
+    <testcase name="Response is JSON (or empty for 204)" time="0.074" classname="1AuthenticationFlowPostAuthLoginWrongPassword400"/>
+    <testcase name="status 400 (invalid credentials)" time="0.074" classname="1AuthenticationFlowPostAuthLoginWrongPassword400"/>
+  </testsuite>
+  <testsuite name="1. Authentication Flow / POST /auth/login — happy path; capture accessToken + refreshToken" id="27998af3-c7ad-4d6c-8949-831bde5507a6" timestamp="2026-06-02T19:42:41.945Z" tests="6" failures="0" errors="0" time="0.079">
+    <testcase name="Response is JSON (or empty for 204)" time="0.079" classname="1AuthenticationFlowPostAuthLoginHappyPathCaptureAccessTokenRefreshToken"/>
+    <testcase name="status 200" time="0.079" classname="1AuthenticationFlowPostAuthLoginHappyPathCaptureAccessTokenRefreshToken"/>
+    <testcase name="body has accessToken + refreshToken" time="0.079" classname="1AuthenticationFlowPostAuthLoginHappyPathCaptureAccessTokenRefreshToken"/>
+    <testcase name="accessToken looks like a JWT (3 dot-separated parts)" time="0.079" classname="1AuthenticationFlowPostAuthLoginHappyPathCaptureAccessTokenRefreshToken"/>
+    <testcase name="user payload has id, email, role and NO password leak" time="0.079" classname="1AuthenticationFlowPostAuthLoginHappyPathCaptureAccessTokenRefreshToken"/>
+    <testcase name="JWT payload has sub, role, typ=access" time="0.079" classname="1AuthenticationFlowPostAuthLoginHappyPathCaptureAccessTokenRefreshToken"/>
+  </testsuite>
+  <testsuite name="1. Authentication Flow / POST /auth/refresh — missing token (401)" id="f57b0ce1-df0c-4d6e-82d6-87ebd1504c27" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.009">
+    <testcase name="Response is JSON (or empty for 204)" time="0.009" classname="1AuthenticationFlowPostAuthRefreshMissingToken401"/>
+    <testcase name="status 401 (NO_REFRESH_TOKEN)" time="0.009" classname="1AuthenticationFlowPostAuthRefreshMissingToken401"/>
+    <testcase name="code = NO_REFRESH_TOKEN" time="0.009" classname="1AuthenticationFlowPostAuthRefreshMissingToken401"/>
+  </testsuite>
+  <testsuite name="1. Authentication Flow / POST /auth/refresh — rotate tokens" id="f019f844-8706-400b-af2a-be658ece0c5b" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.014">
+    <testcase name="Response is JSON (or empty for 204)" time="0.014" classname="1AuthenticationFlowPostAuthRefreshRotateTokens"/>
+    <testcase name="status 200" time="0.014" classname="1AuthenticationFlowPostAuthRefreshRotateTokens"/>
+    <testcase name="rotated access + refresh" time="0.014" classname="1AuthenticationFlowPostAuthRefreshRotateTokens"/>
+  </testsuite>
+  <testsuite name="2. User Flow / GET /auth/{userId} — unauthenticated (401)" id="020df83b-0bf9-45f0-8ab8-53759a80e872" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.011">
+    <testcase name="Response is JSON (or empty for 204)" time="0.011" classname="2UserFlowGetAuthUserIdUnauthenticated401"/>
+    <testcase name="status 401" time="0.011" classname="2UserFlowGetAuthUserIdUnauthenticated401"/>
+  </testsuite>
+  <testsuite name="2. User Flow / GET /auth/{userId} — fetch own profile" id="9cee1fc5-5ae6-4118-a25f-94484717912d" timestamp="2026-06-02T19:42:41.945Z" tests="6" failures="0" errors="0" time="0.009">
+    <testcase name="Response is JSON (or empty for 204)" time="0.009" classname="2UserFlowGetAuthUserIdFetchOwnProfile"/>
+    <testcase name="status 200" time="0.009" classname="2UserFlowGetAuthUserIdFetchOwnProfile"/>
+    <testcase name="id matches our user" time="0.009" classname="2UserFlowGetAuthUserIdFetchOwnProfile"/>
+    <testcase name="email matches our user" time="0.009" classname="2UserFlowGetAuthUserIdFetchOwnProfile"/>
+    <testcase name="role is a canonical ROLE_*" time="0.009" classname="2UserFlowGetAuthUserIdFetchOwnProfile"/>
+    <testcase name="no password leak" time="0.009" classname="2UserFlowGetAuthUserIdFetchOwnProfile"/>
+  </testsuite>
+  <testsuite name="2. User Flow / PATCH /auth/me — update profile (username)" id="0717011a-e65a-45b0-9df8-608dff6661c1" timestamp="2026-06-02T19:42:41.945Z" tests="5" failures="0" errors="0" time="0.021">
+    <testcase name="Response is JSON (or empty for 204)" time="0.021" classname="2UserFlowPatchAuthMeUpdateProfileUsername"/>
+    <testcase name="status 200" time="0.021" classname="2UserFlowPatchAuthMeUpdateProfileUsername"/>
+    <testcase name="success = true" time="0.021" classname="2UserFlowPatchAuthMeUpdateProfileUsername"/>
+    <testcase name="user.id unchanged" time="0.021" classname="2UserFlowPatchAuthMeUpdateProfileUsername"/>
+    <testcase name="username starts with Postman QA" time="0.021" classname="2UserFlowPatchAuthMeUpdateProfileUsername"/>
+  </testsuite>
+  <testsuite name="2. User Flow / PATCH /auth/me — invalid username (&lt;2 chars) is rejected (400)" id="c4ce6990-f1ae-40a6-9c82-afe24dac7db7" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.011">
+    <testcase name="Response is JSON (or empty for 204)" time="0.011" classname="2UserFlowPatchAuthMeInvalidUsernameLt2CharsIsRejected400"/>
+    <testcase name="status 400" time="0.011" classname="2UserFlowPatchAuthMeInvalidUsernameLt2CharsIsRejected400"/>
+  </testsuite>
+  <testsuite name="3. Book Flow / GET /books — unauthenticated (401)" id="263225dc-ce50-48fb-888b-2531ce40a1b1" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.015">
+    <testcase name="Response is JSON (or empty for 204)" time="0.015" classname="3BookFlowGetBooksUnauthenticated401"/>
+    <testcase name="status 401" time="0.015" classname="3BookFlowGetBooksUnauthenticated401"/>
+  </testsuite>
+  <testsuite name="3. Book Flow / GET /books — list books and capture a seed for the borrow flow" id="b2e561eb-c2c1-41eb-a670-250c587570b2" timestamp="2026-06-02T19:42:41.945Z" tests="4" failures="0" errors="0" time="0.027">
+    <testcase name="Response is JSON (or empty for 204)" time="0.027" classname="3BookFlowGetBooksListBooksAndCaptureASeedForTheBorrowFlow"/>
+    <testcase name="status 200" time="0.027" classname="3BookFlowGetBooksListBooksAndCaptureASeedForTheBorrowFlow"/>
+    <testcase name="body is an array" time="0.027" classname="3BookFlowGetBooksListBooksAndCaptureASeedForTheBorrowFlow"/>
+    <testcase name="seed book has the expected shape" time="0.027" classname="3BookFlowGetBooksListBooksAndCaptureASeedForTheBorrowFlow"/>
+  </testsuite>
+  <testsuite name="3. Book Flow / GET /books/{id} — fetch the seed book by id" id="05cf3807-99dc-4b7c-891d-8da96422aca0" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.011">
+    <testcase name="Response is JSON (or empty for 204)" time="0.011" classname="3BookFlowGetBooksIdFetchTheSeedBookById"/>
+    <testcase name="status 200" time="0.011" classname="3BookFlowGetBooksIdFetchTheSeedBookById"/>
+    <testcase name="id matches" time="0.011" classname="3BookFlowGetBooksIdFetchTheSeedBookById"/>
+  </testsuite>
+  <testsuite name="3. Book Flow / POST /books — RBAC: non-admin user rejected (403)" id="744bec3a-0d61-4192-9538-d8add05e7f4d" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.011">
+    <testcase name="Response is JSON (or empty for 204)" time="0.011" classname="3BookFlowPostBooksRbacNonAdminUserRejected403"/>
+    <testcase name="status 403 (regular user cannot create books)" time="0.011" classname="3BookFlowPostBooksRbacNonAdminUserRejected403"/>
+  </testsuite>
+  <testsuite name="3. Book Flow / POST /auth/login (admin) — optional; enables admin book CRUD" id="326a10e7-d227-4350-9bd3-5aa688751649" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.079">
+    <testcase name="Response is JSON (or empty for 204)" time="0.079" classname="3BookFlowPostAuthLoginAdminOptionalEnablesAdminBookCrud"/>
+    <testcase name="admin login returned a token + admin role" time="0.079" classname="3BookFlowPostAuthLoginAdminOptionalEnablesAdminBookCrud"/>
+  </testsuite>
+  <testsuite name="3. Book Flow / POST /books — create as admin" id="6a0e4975-aaf1-4c95-add1-bee41981c27c" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.022">
+    <testcase name="Response is JSON (or empty for 204)" time="0.022" classname="3BookFlowPostBooksCreateAsAdmin"/>
+    <testcase name="status 200" time="0.022" classname="3BookFlowPostBooksCreateAsAdmin"/>
+    <testcase name="returns book id + canonical fields" time="0.022" classname="3BookFlowPostBooksCreateAsAdmin"/>
+  </testsuite>
+  <testsuite name="3. Book Flow / PUT /books/{id} — update as admin" id="7d51cde0-1f63-4c40-8d97-70c58dea3ef5" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.022">
+    <testcase name="Response is JSON (or empty for 204)" time="0.022" classname="3BookFlowPutBooksIdUpdateAsAdmin"/>
+    <testcase name="status 200" time="0.022" classname="3BookFlowPutBooksIdUpdateAsAdmin"/>
+    <testcase name="success=true and book reflects the patch" time="0.022" classname="3BookFlowPutBooksIdUpdateAsAdmin"/>
+  </testsuite>
+  <testsuite name="3. Book Flow / DELETE /books/{id} — clean up the admin-created book" id="de5f5709-87d7-4cae-ab50-498069ac53c9" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.020">
+    <testcase name="Response is JSON (or empty for 204)" time="0.020" classname="3BookFlowDeleteBooksIdCleanUpTheAdminCreatedBook"/>
+    <testcase name="status 200" time="0.020" classname="3BookFlowDeleteBooksIdCleanUpTheAdminCreatedBook"/>
+  </testsuite>
+  <testsuite name="4. Borrow Flow / POST /borrow — unauthenticated (401)" id="2200d9d3-1776-464c-9d59-575b7ff05e96" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.010">
+    <testcase name="Response is JSON (or empty for 204)" time="0.010" classname="4BorrowFlowPostBorrowUnauthenticated401"/>
+    <testcase name="status 401" time="0.010" classname="4BorrowFlowPostBorrowUnauthenticated401"/>
+  </testsuite>
+  <testsuite name="4. Borrow Flow / POST /borrow — happy path, availability decreases by 1" id="4a4cf7af-1d6b-4dc9-982a-19501eb45526" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.087">
+    <testcase name="Response is JSON (or empty for 204)" time="0.087" classname="4BorrowFlowPostBorrowHappyPathAvailabilityDecreasesBy1"/>
+    <testcase name="status 200" time="0.087" classname="4BorrowFlowPostBorrowHappyPathAvailabilityDecreasesBy1"/>
+    <testcase name="returns BORROWED record with snippet" time="0.087" classname="4BorrowFlowPostBorrowHappyPathAvailabilityDecreasesBy1"/>
+  </testsuite>
+  <testsuite name="4. Borrow Flow / GET /books/{id} — availableCopies decreased by exactly 1" id="27fdeaf4-6fd0-4f92-83a7-82b4d3f8f7c0" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.009">
+    <testcase name="Response is JSON (or empty for 204)" time="0.009" classname="4BorrowFlowGetBooksIdAvailableCopiesDecreasedByExactly1"/>
+    <testcase name="status 200" time="0.009" classname="4BorrowFlowGetBooksIdAvailableCopiesDecreasedByExactly1"/>
+    <testcase name="availableCopies dropped from 5 to 4" time="0.009" classname="4BorrowFlowGetBooksIdAvailableCopiesDecreasedByExactly1"/>
+  </testsuite>
+  <testsuite name="4. Borrow Flow / GET /borrow/{userId} — list this user's borrows includes the new record" id="ede327ad-8a8e-4d7d-ac8c-2615696dd6ef" timestamp="2026-06-02T19:42:41.945Z" tests="4" failures="0" errors="0" time="0.027">
+    <testcase name="Response is JSON (or empty for 204)" time="0.027" classname="4BorrowFlowGetBorrowUserIdListThisUsersBorrowsIncludesTheNewRecord"/>
+    <testcase name="status 200" time="0.027" classname="4BorrowFlowGetBorrowUserIdListThisUsersBorrowsIncludesTheNewRecord"/>
+    <testcase name="body is an array" time="0.027" classname="4BorrowFlowGetBorrowUserIdListThisUsersBorrowsIncludesTheNewRecord"/>
+    <testcase name="contains the freshly-created borrow id" time="0.027" classname="4BorrowFlowGetBorrowUserIdListThisUsersBorrowsIncludesTheNewRecord"/>
+  </testsuite>
+  <testsuite name="4. Borrow Flow / PUT /borrow/return/{borrowId} — return the book, availability restored" id="1461ee11-a665-473b-89e7-adf5467d70f2" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.048">
+    <testcase name="Response is JSON (or empty for 204)" time="0.048" classname="4BorrowFlowPutBorrowReturnBorrowIdReturnTheBookAvailabilityRestored"/>
+    <testcase name="status 200" time="0.048" classname="4BorrowFlowPutBorrowReturnBorrowIdReturnTheBookAvailabilityRestored"/>
+    <testcase name="status flipped to RETURNED" time="0.048" classname="4BorrowFlowPutBorrowReturnBorrowIdReturnTheBookAvailabilityRestored"/>
+  </testsuite>
+  <testsuite name="4. Borrow Flow / GET /books/{id} — availableCopies restored to original" id="32ddcba0-3ea2-40cf-815d-1abd972dac4b" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.009">
+    <testcase name="Response is JSON (or empty for 204)" time="0.009" classname="4BorrowFlowGetBooksIdAvailableCopiesRestoredToOriginal"/>
+    <testcase name="status 200" time="0.009" classname="4BorrowFlowGetBooksIdAvailableCopiesRestoredToOriginal"/>
+    <testcase name="availableCopies back to 5" time="0.009" classname="4BorrowFlowGetBooksIdAvailableCopiesRestoredToOriginal"/>
+  </testsuite>
+  <testsuite name="5. Support Flow / POST /support/tickets — create a support ticket as a logged-in user" id="d97a4217-8b4d-48d5-8582-cb017c1c12e9" timestamp="2026-06-02T19:42:41.945Z" tests="4" failures="0" errors="0" time="0.029">
+    <testcase name="Response is JSON (or empty for 204)" time="0.029" classname="5SupportFlowPostSupportTicketsCreateASupportTicketAsALoggedInUser"/>
+    <testcase name="status 200/201" time="0.029" classname="5SupportFlowPostSupportTicketsCreateASupportTicketAsALoggedInUser"/>
+    <testcase name="returns a ticket with an id" time="0.029" classname="5SupportFlowPostSupportTicketsCreateASupportTicketAsALoggedInUser"/>
+    <testcase name="starts in OPEN status" time="0.029" classname="5SupportFlowPostSupportTicketsCreateASupportTicketAsALoggedInUser"/>
+  </testsuite>
+  <testsuite name="5. Support Flow / GET /support/tickets/me — the new ticket appears in my history" id="9a7375f8-ce0b-4e97-bfa3-b29150949267" timestamp="2026-06-02T19:42:41.945Z" tests="4" failures="0" errors="0" time="0.012">
+    <testcase name="Response is JSON (or empty for 204)" time="0.012" classname="5SupportFlowGetSupportTicketsMeTheNewTicketAppearsInMyHistory"/>
+    <testcase name="status 200" time="0.012" classname="5SupportFlowGetSupportTicketsMeTheNewTicketAppearsInMyHistory"/>
+    <testcase name="returns an array of tickets" time="0.012" classname="5SupportFlowGetSupportTicketsMeTheNewTicketAppearsInMyHistory"/>
+    <testcase name="includes the ticket created above" time="0.012" classname="5SupportFlowGetSupportTicketsMeTheNewTicketAppearsInMyHistory"/>
+  </testsuite>
+  <testsuite name="5. Support Flow / POST /support/tickets/:id/reply — user reply on their own ticket" id="12d67677-a7eb-44fc-b74c-383f14ab8d0d" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.027">
+    <testcase name="Response is JSON (or empty for 204)" time="0.027" classname="5SupportFlowPostSupportTicketsIdReplyUserReplyOnTheirOwnTicket"/>
+    <testcase name="status 200/201" time="0.027" classname="5SupportFlowPostSupportTicketsIdReplyUserReplyOnTheirOwnTicket"/>
+    <testcase name="reply was appended" time="0.027" classname="5SupportFlowPostSupportTicketsIdReplyUserReplyOnTheirOwnTicket"/>
+  </testsuite>
+  <testsuite name="5. Support Flow / PATCH /support/tickets/:id/status — admin closes the ticket (skipped without admin creds)" id="4e92f31a-5a2e-46ef-94a4-b1d34cc13609" timestamp="2026-06-02T19:42:41.945Z" tests="3" failures="0" errors="0" time="0.021">
+    <testcase name="Response is JSON (or empty for 204)" time="0.021" classname="5SupportFlowPatchSupportTicketsIdStatusAdminClosesTheTicketSkippedWithoutAdminCreds"/>
+    <testcase name="status 200" time="0.021" classname="5SupportFlowPatchSupportTicketsIdStatusAdminClosesTheTicketSkippedWithoutAdminCreds"/>
+    <testcase name="ticket is now CLOSED" time="0.021" classname="5SupportFlowPatchSupportTicketsIdStatusAdminClosesTheTicketSkippedWithoutAdminCreds"/>
+  </testsuite>
+  <testsuite name="6. Admin Reporting / GET /users (admin) — paginated user list" id="7f232487-9e3a-49d5-a8b8-faeb9d7f29c4" timestamp="2026-06-02T19:42:41.945Z" tests="4" failures="0" errors="0" time="0.181">
+    <testcase name="Response is JSON (or empty for 204)" time="0.181" classname="6AdminReportingGetUsersAdminPaginatedUserList"/>
+    <testcase name="status 200" time="0.181" classname="6AdminReportingGetUsersAdminPaginatedUserList"/>
+    <testcase name="returns an array of users" time="0.181" classname="6AdminReportingGetUsersAdminPaginatedUserList"/>
+    <testcase name="never leaks the password column" time="0.181" classname="6AdminReportingGetUsersAdminPaginatedUserList"/>
+  </testsuite>
+  <testsuite name="6. Admin Reporting / GET /users/admin/stats — dashboard counts (the reporting surface)" id="2a961fa2-b973-4e02-a8e9-e6572f5d4c07" timestamp="2026-06-02T19:42:41.945Z" tests="4" failures="0" errors="0" time="0.035">
+    <testcase name="Response is JSON (or empty for 204)" time="0.035" classname="6AdminReportingGetUsersAdminStatsDashboardCountsTheReportingSurface"/>
+    <testcase name="status 200" time="0.035" classname="6AdminReportingGetUsersAdminStatsDashboardCountsTheReportingSurface"/>
+    <testcase name="exposes totalUsers (numeric)" time="0.035" classname="6AdminReportingGetUsersAdminStatsDashboardCountsTheReportingSurface"/>
+    <testcase name="exposes totalBooks (numeric)" time="0.035" classname="6AdminReportingGetUsersAdminStatsDashboardCountsTheReportingSurface"/>
+  </testsuite>
+  <testsuite name="7. Negative / Error cases / GET /books/99999999 — unknown id returns 404" id="5af22b68-e851-4ff5-b393-a82de7d2baea" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.013">
+    <testcase name="Response is JSON (or empty for 204)" time="0.013" classname="7NegativeErrorCasesGetBooks99999999UnknownIdReturns404"/>
+    <testcase name="status 404" time="0.013" classname="7NegativeErrorCasesGetBooks99999999UnknownIdReturns404"/>
+  </testsuite>
+  <testsuite name="7. Negative / Error cases / PUT /borrow/return/99999999 — non-existent borrow id returns 4xx" id="de9d6f06-82cc-4797-a286-04d16248b092" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.011">
+    <testcase name="Response is JSON (or empty for 204)" time="0.011" classname="7NegativeErrorCasesPutBorrowReturn99999999NonExistentBorrowIdReturns4Xx"/>
+    <testcase name="rejects with a 4xx (not 5xx)" time="0.011" classname="7NegativeErrorCasesPutBorrowReturn99999999NonExistentBorrowIdReturns4Xx"/>
+  </testsuite>
+  <testsuite name="7. Negative / Error cases / GET /books with malformed Bearer token returns 401" id="02624a12-38c1-4901-9613-e77ed8c53b2b" timestamp="2026-06-02T19:42:41.945Z" tests="2" failures="0" errors="0" time="0.009">
+    <testcase name="Response is JSON (or empty for 204)" time="0.009" classname="7NegativeErrorCasesGetBooksWithMalformedBearerTokenReturns401"/>
+    <testcase name="status 401" time="0.009" classname="7NegativeErrorCasesGetBooksWithMalformedBearerTokenReturns401"/>
+  </testsuite>
+</testsuites>

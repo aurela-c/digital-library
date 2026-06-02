@@ -1,99 +1,366 @@
-version: "3.8"
+# =============================================================================
+# Digital Library — full stack docker-compose.
+#
+#   docker compose up --build
+#
+# Spins up: MySQL, Redis, RabbitMQ, 5 Node microservices, the Vite/React
+# frontend served by nginx, plus Prometheus + Grafana for observability.
+#
+# All inter-service communication uses docker service names (`mysql`,
+# `redis`, `rabbitmq`, `auth-service`, etc.) — no `localhost`. Service
+# dependencies wait for the underlying stateful containers to be HEALTHY
+# (not just started) before booting so a fresh `up` succeeds first time.
+#
+# Secrets:
+#   The compose file pulls secrets from the SHELL environment (or a
+#   `.env` file sitting next to this docker-compose.yml). See `.env.example`.
+#   In particular, `EMAIL_APP_PASSWORD` is required for the auth-service
+#   email flow; everything else has safe defaults for local dev.
+# =============================================================================
+#
+# NB: no top-level `version:` field on purpose. The modern Compose Spec
+# (Docker Compose v2.x) treats it as obsolete and prints a warning if
+# present. The schema is inferred from the keys used below.
 
 networks:
   app_net:
     driver: bridge
 
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:
+
+# ---------------------------------------------------------------------------
+# Reusable bits via YAML anchors — keep service definitions readable.
+# ---------------------------------------------------------------------------
+x-node-env: &node-env
+  NODE_ENV: production
+  LOG_FORMAT: json
+  # Every Node service shares the same MySQL / Redis / RabbitMQ / JWT config.
+  MYSQL_URL: "mysql://root:${MYSQL_ROOT_PASSWORD:-password}@mysql:3306/${MYSQL_DATABASE:-digital_library}"
+  REDIS_URL: "redis://redis:6379"
+  RABBITMQ_URL: "amqp://${RABBITMQ_DEFAULT_USER:-guest}:${RABBITMQ_DEFAULT_PASS:-guest}@rabbitmq:5672"
+  ACCESS_SECRET: "${ACCESS_SECRET:-change-me-access-secret-min-32-chars}"
+  REFRESH_SECRET: "${REFRESH_SECRET:-change-me-refresh-secret-min-32-chars}"
+  JWT_ACCESS_EXPIRES_IN: "${JWT_ACCESS_EXPIRES_IN:-1h}"
+  JWT_REFRESH_EXPIRES_IN: "${JWT_REFRESH_EXPIRES_IN:-7d}"
+  # Consul isn't part of this stack; force it off so the registration
+  # call doesn't print warnings every 1.5s after boot.
+  CONSUL_ENABLED: "false"
+
 services:
+
+  # =========================================================================
+  # INFRASTRUCTURE
+  # =========================================================================
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-digital_library}
+    command:
+      # `mysql_native_password` keeps the legacy auth plugin so older
+      # mysql2 driver releases connect without the caching_sha2 dance.
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - app_net
+    healthcheck:
+      # `--silent` suppresses the connection banner so a non-zero exit
+      # really means MySQL isn't accepting connections yet.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-password}", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # Browser-based MySQL admin UI. Pure dev convenience — connects to the
+  # same `mysql` service over the docker network using the existing root
+  # credentials. Exposed on http://localhost:8080.
+  #
+  # Auto-login is enabled for local dev (PMA_USER / PMA_PASSWORD). Comment
+  # those two lines out (or unset them in your shell) to force the normal
+  # phpMyAdmin login screen instead.
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: "3306"
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+      # Cap upload size so importing larger SQL dumps doesn't 413.
+      UPLOAD_LIMIT: 256M
+    ports:
+      - "8080:80"
+    networks:
+      - app_net
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  rabbitmq:
+    # `*-management-alpine` includes the web UI on :15672.
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # management UI
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # =========================================================================
+  # MICROSERVICES
+  # =========================================================================
 
   auth-service:
     build:
       context: .
       dockerfile: auth-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *node-env
+      PORT: "5001"
+      AUTH_GRPC_PORT: "5010"
+      # Email flow uses these. EMAIL_APP_PASSWORD MUST be set in the shell
+      # / .env or password-reset / verification emails will fail.
+      EMAIL_USER: "${EMAIL_USER:-}"
+      EMAIL_APP_PASSWORD: "${EMAIL_APP_PASSWORD:-}"
+      # URLs baked into outbound emails — must be browser-reachable.
+      # The gateway port is published, so the host can hit it directly.
+      BACKEND_URL: "${BACKEND_URL:-http://localhost:4000}"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost}"
+      # Default-on in compose so integration tests (Postman/Newman, Jest
+      # under microservices/tests) can register → login a brand-new user
+      # without a real Gmail App Password / browser click. Set to "false"
+      # in a real production deployment if you want verification enforced.
+      AUTH_SKIP_EMAIL_VERIFY: "${AUTH_SKIP_EMAIL_VERIFY:-true}"
     ports:
       - "5001:5001"
       - "5010:5010"
-    environment:
-      AUTH_GRPC_PORT: "5010"
     networks:
       - app_net
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   user-service:
     build:
       context: .
       dockerfile: user-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *node-env
+      PORT: "5002"
+      USER_GRPC_PORT: "5012"
     ports:
       - "5002:5002"
       - "5012:5012"
-    environment:
-      USER_GRPC_PORT: "5012"
     networks:
       - app_net
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   book-service:
     build:
       context: .
       dockerfile: book-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *node-env
+      PORT: "5003"
+      BOOK_GRPC_PORT: "5013"
     ports:
       - "5003:5003"
       - "5013:5013"
-    environment:
-      BOOK_GRPC_PORT: "5013"
     networks:
       - app_net
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   borrow-service:
     build:
       context: .
       dockerfile: borrow-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *node-env
+      PORT: "5004"
+      BORROW_GRPC_PORT: "5014"
+      # gRPC target inside the docker network — overrides the localhost
+      # default baked into borrow-service/.env.example.
+      BOOK_SERVICE_GRPC: "book-service:5013"
     ports:
       - "5004:5004"
       - "5014:5014"
-    environment:
-      BORROW_GRPC_PORT: "5014"
     networks:
       - app_net
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      book-service:
+        condition: service_started
 
   gateway:
     build:
       context: .
       dockerfile: api-gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *node-env
+      PORT: "4000"
+      # gRPC stubs — docker DNS, NOT localhost.
+      AUTH_SERVICE_GRPC: "auth-service:5010"
+      USER_SERVICE_GRPC: "user-service:5012"
+      BOOK_SERVICE_GRPC: "book-service:5013"
+      BORROW_SERVICE_GRPC: "borrow-service:5014"
+      # HTTP proxy targets for the REST forwarding paths.
+      AUTH_SERVICE_URL: "http://auth-service:5001"
+      USER_SERVICE_URL: "http://user-service:5002"
+      BOOK_SERVICE_URL: "http://book-service:5003"
+      BORROW_SERVICE_URL: "http://borrow-service:5004"
+      # nginx in the `frontend` service is same-origin so this only matters
+      # for tools hitting the gateway port directly from the host.
+      CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost,http://localhost:5173,http://localhost:8080}"
+      # The gateway sits behind nginx (frontend container) which serves
+      # plain HTTP. Without this flag the production-mode httpsRedirect
+      # middleware would 301 every request — including the container's
+      # own HEALTHCHECK — to https://localhost, which has no TLS listener.
+      # See microservices/api-gateway/security/httpsRedirect.js for the
+      # full rationale.
+      DISABLE_HTTPS_REDIRECT: "true"
+      # Optional rate-limit overrides. Defaults baked into rateLimiter.js
+      # are 100 requests / 60 000 ms / IP. Locust load runs export
+      # these via `locust/docker-compose.locust.yml` so the limiter
+      # doesn't 429-suppress 1000-VU stress traffic. Leave unset to
+      # keep production limits in force.
+      GATEWAY_RATE_LIMIT_MAX: "${GATEWAY_RATE_LIMIT_MAX:-}"
+      GATEWAY_RATE_LIMIT_WINDOW_MS: "${GATEWAY_RATE_LIMIT_WINDOW_MS:-}"
     ports:
       - "4000:4000"
-    environment:
-      AUTH_SERVICE_GRPC: auth-service:5010
-      USER_SERVICE_GRPC: user-service:5012
-      BOOK_SERVICE_GRPC: book-service:5013
-      BORROW_SERVICE_GRPC: borrow-service:5014
     networks:
       - app_net
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      book-service:
+        condition: service_started
+      borrow-service:
+        condition: service_started
+
+  # =========================================================================
+  # FRONTEND
+  # =========================================================================
+
+  frontend:
+    build:
+      # Frontend source lives one directory ABOVE microservices/. This
+      # context lets the Dockerfile COPY the whole frontend tree.
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        # `/` collapses to "" in the SPA's apiBase resolver, so axios
+        # makes RELATIVE calls (`/auth/login`) and nginx proxies them to
+        # the gateway over the docker network. No CORS, no env-aware JS.
+        VITE_GATEWAY_TARGET: "/"
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - app_net
+    depends_on:
+      gateway:
+        condition: service_started
+
+  # =========================================================================
+  # OBSERVABILITY
+  # =========================================================================
 
   prometheus:
     image: prom/prometheus:v2.54.1
+    restart: unless-stopped
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"  # `curl -X POST /-/reload` after edits
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     networks:
       - app_net
+    # `extra_hosts` kept so dev workflows that run a service on the host
+    # for hot-reload (instead of in compose) can still be scraped via
+    # `host.docker.internal:<port>` if the user adds an extra target.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
-      - gateway
-      - auth-service
-      - user-service
-      - book-service
-      - borrow-service
+      gateway:
+        condition: service_started
 
   grafana:
     image: grafana/grafana:11.2.0
+    restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/http-overview.json
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
     networks:

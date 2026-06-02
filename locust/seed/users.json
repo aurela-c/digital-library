@@ -1,0 +1,11 @@
+{
+  "_meta": "Test accounts re-used across Cypress + Postman + Locust. Override per environment via the LOCUST_*_EMAIL / LOCUST_*_PASSWORD env vars (see docker-compose.locust.yml and locust/README.md).",
+  "user": {
+    "email": "aurelacocaj1@gmail.com",
+    "password": "ela12345"
+  },
+  "admin": {
+    "email": "admin@library.com",
+    "password": "admin123"
+  }
+}

@@ -266,6 +266,10 @@ app.use(createErrorHandler(logger));
 
 const port = Number(process.env.PORT) || 4000;
 printExpressStack(app, "api-gateway");
-app.listen(port, () => {
-  logger.info(`HTTP listening on port ${port}`);
+// Explicit 0.0.0.0 bind so the gateway is reachable from sibling
+// containers (nginx frontend, prometheus, etc.) inside the docker
+// network. Node defaults to dual-stack on Linux but the explicit form
+// avoids surprises across docker host platforms.
+app.listen(port, "0.0.0.0", () => {
+  logger.info(`HTTP listening on 0.0.0.0:${port}`);
 });

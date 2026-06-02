@@ -248,6 +248,32 @@ export const authService = {
       throw err;
     }
 
+    // Enforce account state at refresh time. Without this, a banned or
+    // deactivated user could indefinitely extend their session by
+    // refreshing — the access-token check at login wouldn't matter,
+    // because they'd never need to log in again.
+    //
+    // With this in place, the worst-case lock-out delay after an admin
+    // bans a user is one access-token TTL (default 1h): the live token
+    // keeps working until it expires, but the next refresh is rejected
+    // and the user is forced back to /login (which then 403s on the
+    // login flow).
+    const status = String(user.accountStatus || "ACTIVE").toUpperCase();
+    if (status === "BANNED") {
+      auditLog({ action: "REFRESH_DENIED_BANNED", userId: user.id });
+      const err = new Error("Account suspended");
+      err.status = 403;
+      err.code = "ACCOUNT_BANNED";
+      throw err;
+    }
+    if (status === "INACTIVE") {
+      auditLog({ action: "REFRESH_DENIED_INACTIVE", userId: user.id });
+      const err = new Error("Account inactive");
+      err.status = 403;
+      err.code = "ACCOUNT_INACTIVE";
+      throw err;
+    }
+
     const accessToken = signAccessToken(user);
     const newRefresh = issueRefreshToken(user);
 

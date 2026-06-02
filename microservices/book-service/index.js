@@ -33,7 +33,19 @@ app.use(createRequestLogMiddleware(logger));
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => {
+// NB: do NOT register an inline `app.get("/", ...)` placeholder here.
+// The API gateway proxies "/books" to this service and STRIPS the "/books"
+// prefix, so the request that arrives is "GET /". A placeholder mounted at
+// "/" would match first and shadow `bookRoutes.get("/")` (the catalog
+// list), causing the admin dashboard, category pages and the homepage
+// "Popular Now" carousel to receive a plain "Service Running" string
+// instead of the books array. From the UI side this looked like:
+//   - "books exist in DB but don't appear in admin UI"
+//   - "category page shows only seed books, never the admin-added ones"
+//   - "Popular Now is stuck and can't be toggled"
+// All three symptoms were a single bug — a shadowed list route.
+// If you need a heartbeat, use `/_status` or `/health` (already defined).
+app.get("/_status", (req, res) => {
   res.send("Book Service Running");
 });
 
@@ -103,8 +115,9 @@ const start = async () => {
     }
 
     const httpPort = Number(process.env.PORT) || 5003;
-    app.listen(httpPort, () => {
-      logger.info(`HTTP listening on port ${httpPort}`);
+    // Explicit 0.0.0.0 bind — see auth-service/index.js for rationale.
+    app.listen(httpPort, "0.0.0.0", () => {
+      logger.info(`HTTP listening on 0.0.0.0:${httpPort}`);
 
       setTimeout(() => {
         registerService("book-service", httpPort);

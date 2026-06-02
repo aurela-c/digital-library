@@ -1,0 +1,5 @@
+{
+  "_comment": "Marks every .js file in this directory as ESM. The shared test helpers (http.js etc.) use `import { jest } from '@jest/globals'`, but they live OUTSIDE any service package.json, so without this marker Node walks up to the repo root, finds no `\"type\": \"module\"`, and classifies the files as CJS. Jest's experimental VM-modules loader usually masks this with its own ESM classifier, but the race is non-deterministic on Windows and produces 'Unexpected import statement in CJS module' errors at module-load time. This file makes the classification deterministic without touching any test code.",
+  "type": "module",
+  "private": true
+}

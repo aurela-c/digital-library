@@ -1,0 +1,13 @@
+{
+  "_meta": "These are the well-known test accounts the Cypress suite reuses. Defaults match the live development database; override per environment via CYPRESS_userEmail / CYPRESS_adminEmail etc. (see cypress.config.js > env).",
+  "user": {
+    "email": "aurelacocaj1@gmail.com",
+    "password": "ela12345",
+    "name": "aurela"
+  },
+  "admin": {
+    "email": "admin@library.com",
+    "password": "admin123",
+    "name": "Admin"
+  }
+}

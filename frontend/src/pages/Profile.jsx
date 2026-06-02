@@ -31,6 +31,7 @@ import {
 } from "../services/api";
 import { AuthContext } from "../../context/AuthContext.jsx";
 import { isAdminRole } from "../utils/roles.js";
+import LogoutButton from "../components/LogoutButton.jsx";
 
 // ============================================================
 // Constants / helpers
@@ -415,7 +416,12 @@ const Profile = () => {
             />
           </aside>
 
-          {/* Dashboard sections */}
+          {/* Dashboard sections — hidden while the user is in
+              account-management mode (Security tab), because the
+              library-centric panels (Activity → borrowed books, Stats,
+              Favorites, Notifications) are not relevant to the delete-
+              account / change-password experience. */}
+          {sidebarTab !== "security" && (
           <main className="min-w-0 lg:col-span-7 xl:col-span-8">
             <nav
               className="mb-5 flex flex-wrap gap-2"
@@ -483,6 +489,7 @@ const Profile = () => {
               <NotificationsSection notificationsApi={notificationsApi} />
             )}
           </main>
+          )}
         </div>
       </PageContainer>
     </div>
@@ -605,6 +612,18 @@ const ProfileSidebar = ({
         {activeTab === "security" && (
           <SecurityPanel onAccountDeleted={onLogout} />
         )}
+      </div>
+
+      {/* Account-wide action — always visible regardless of which tab
+          is selected, so the user can end the session from anywhere
+          inside their profile. Confirmation + immediate /login redirect
+          are handled inside LogoutButton, identically to the admin
+          panel button. */}
+      <div className="mt-5 border-t border-gray-100 pt-4">
+        <LogoutButton
+          className="inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:border-[#D34F4E]/30 hover:bg-[#f5efe9] hover:text-[#D34F4E]"
+          iconClassName="h-4 w-4"
+        />
       </div>
     </div>
   </div>
