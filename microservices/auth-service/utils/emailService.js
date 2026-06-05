@@ -1,14 +1,20 @@
 import nodemailer from "nodemailer";
+import { lookup as dnsLookup } from "dns";
+
+const ipv4OnlyLookup = (hostname, options, callback) => {
+  if (typeof options === "function") {
+    callback = options;
+    options = {};
+  }
+  return dnsLookup(hostname, { ...(options || {}), family: 4 }, callback);
+};
 
 const APP_NAME = process.env.APP_NAME || "Digital Library";
 const DEFAULT_SENDER = "aurelacocaj1@gmail.com";
 
-// ---------- credential helpers ----------
 const senderAddress = () =>
   String(process.env.EMAIL_USER || DEFAULT_SENDER).trim();
 
-// Google App Passwords are 16 chars and are usually copied with spaces
-// (e.g. "abcd efgh ijkl mnop"). Strip ALL whitespace to be safe.
 const senderPassword = () =>
   String(process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASS || "")
     .replace(/\s+/g, "");
@@ -16,12 +22,10 @@ const senderPassword = () =>
 const isDebug = () =>
   String(process.env.EMAIL_DEBUG || "").toLowerCase() === "true";
 
-// ---------- transporter (single cached instance) ----------
 let _transporter = null;
 let _transporterKey = null;
 
 function transporterKey() {
-  // Recreate transporter if env changes (rare; mostly for hot-reload).
   return `${senderAddress()}::${senderPassword().slice(0, 4)}`;
 }
 
@@ -29,20 +33,13 @@ function buildTransport() {
   const user = senderAddress();
   const pass = senderPassword();
 
-  // Explicit Gmail SMTP config. Port 587 + STARTTLS is the most portable
-  // variant — every managed platform (Railway, Render, Fly, Heroku) allows
-  // outbound 587 while many block 465. `family: 4` forces IPv4 because
-  // smtp.gmail.com has AAAA records and most PaaS containers cannot reach
-  // IPv6 destinations (manifests as ENETUNREACH 2607:f8b0:...:465).
-  // Timeouts are tight so a transient SMTP outage fails fast instead of
-  // hanging the whole request for two minutes.
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
-    secure: false,        // upgrade to TLS after CONNECT via STARTTLS
-    requireTLS: true,     // refuse to send if STARTTLS handshake fails
+    secure: false,        
+    requireTLS: true,    
     auth: { user, pass },
-    family: 4,            // force IPv4 — avoids ENETUNREACH on PaaS
+    lookup: ipv4OnlyLookup,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 30000,
@@ -60,7 +57,6 @@ function getTransporter() {
   return _transporter;
 }
 
-// ---------- public api ----------
 export async function verifyEmailTransport() {
   if (!senderPassword()) {
     console.warn(
@@ -87,14 +83,6 @@ export async function verifyEmailTransport() {
   }
 }
 
-/**
- * Low-level sender — used by all higher-level helpers.
- *
- * Logs (per spec):
- *   EMAIL SENDING STARTED -> { to, subject }
- *   EMAIL SENT SUCCESS    -> { to, messageId, accepted, rejected, response }
- *   EMAIL ERROR           -> { to, full error object }
- */
 export const sendEmail = async (to, subject, html) => {
   const from = `"${APP_NAME}" <${senderAddress()}>`;
   const pass = senderPassword();
@@ -123,7 +111,6 @@ export const sendEmail = async (to, subject, html) => {
     });
     return info;
   } catch (err) {
-    // Never swallow — print everything that could explain the failure.
     console.error("EMAIL ERROR ->", {
       to,
       subject,
@@ -138,7 +125,6 @@ export const sendEmail = async (to, subject, html) => {
   }
 };
 
-// ---------- templates ----------
 const layout = ({ title, intro, ctaUrl, ctaLabel, footer }) => `
 <!doctype html>
 <html lang="en">
@@ -216,7 +202,6 @@ export const sendPasswordResetEmail = (to, resetUrl, minutesValid = 60) =>
     })
   );
 
-/** Simple plain-content sender used by POST /auth/test-email. */
 export const sendTestEmail = (to) =>
   sendEmail(
     to,
