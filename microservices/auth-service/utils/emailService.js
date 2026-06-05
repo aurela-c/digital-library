@@ -1,28 +1,43 @@
 import nodemailer from "nodemailer";
 import { resolve4 } from "dns/promises";
 
-const GMAIL_SMTP_HOST = "smtp.gmail.com";
-let _gmailIPv4Promise = null;
-function resolveGmailIPv4() {
-  if (_gmailIPv4Promise) return _gmailIPv4Promise;
-  _gmailIPv4Promise = resolve4(GMAIL_SMTP_HOST).then((addrs) => {
-    if (!addrs.length) {
-      throw new Error(`No IPv4 A record for ${GMAIL_SMTP_HOST}`);
-    }
+// SMTP config is env-driven so we can swap providers without redeploys.
+// Defaults to Gmail (for local dev). On Railway (which blocks outbound
+// SMTP to Gmail) set SMTP_HOST/PORT/USER/PASS to a relay that listens
+// on port 2525 (Brevo, SendGrid, Mailgun, ...).
+const SMTP_HOST = (process.env.SMTP_HOST || "smtp.gmail.com").trim();
+const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
+const SMTP_SECURE =
+  process.env.SMTP_SECURE != null
+    ? String(process.env.SMTP_SECURE).toLowerCase() === "true"
+    : SMTP_PORT === 465;
+
+let _hostIPv4Promise = null;
+function resolveHostIPv4() {
+  if (_hostIPv4Promise) return _hostIPv4Promise;
+  _hostIPv4Promise = resolve4(SMTP_HOST).then((addrs) => {
+    if (!addrs.length) throw new Error(`No IPv4 A record for ${SMTP_HOST}`);
     return addrs[0];
   });
-  return _gmailIPv4Promise;
+  return _hostIPv4Promise;
 }
 
 const APP_NAME = process.env.APP_NAME || "Digital Library";
 const DEFAULT_SENDER = "aurelacocaj1@gmail.com";
 
 const senderAddress = () =>
-  String(process.env.EMAIL_USER || DEFAULT_SENDER).trim();
+  String(process.env.EMAIL_FROM || process.env.EMAIL_USER || DEFAULT_SENDER).trim();
 
-const senderPassword = () =>
-  String(process.env.EMAIL_APP_PASSWORD || process.env.EMAIL_PASS || "")
-    .replace(/\s+/g, "");
+const smtpUser = () =>
+  String(process.env.SMTP_USER || process.env.EMAIL_USER || DEFAULT_SENDER).trim();
+
+const smtpPass = () =>
+  String(
+    process.env.SMTP_PASS ||
+      process.env.EMAIL_APP_PASSWORD ||
+      process.env.EMAIL_PASS ||
+      ""
+  ).replace(/\s+/g, "");
 
 const isDebug = () =>
   String(process.env.EMAIL_DEBUG || "").toLowerCase() === "true";
@@ -31,24 +46,25 @@ let _transporter = null;
 let _transporterKey = null;
 
 function transporterKey() {
-  return `${senderAddress()}::${senderPassword().slice(0, 4)}`;
+  return `${SMTP_HOST}:${SMTP_PORT}:${smtpUser()}::${smtpPass().slice(0, 4)}`;
 }
 
 async function buildTransport() {
-  const user = senderAddress();
-  const pass = senderPassword();
-  const ipv4 = await resolveGmailIPv4();
+  const user = smtpUser();
+  const pass = smtpPass();
+  const ipv4 = await resolveHostIPv4();
 
   return nodemailer.createTransport({
     host: ipv4,
-    port: 465,
-    secure: true,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    requireTLS: !SMTP_SECURE,
     auth: { user, pass },
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 30000,
     tls: {
-      servername: GMAIL_SMTP_HOST,
+      servername: SMTP_HOST,
       rejectUnauthorized: true,
     },
     logger: isDebug(),
@@ -65,10 +81,10 @@ async function getTransporter() {
 }
 
 export async function verifyEmailTransport() {
-  if (!senderPassword()) {
+  if (!smtpPass()) {
     console.warn(
-      "[email] EMAIL_APP_PASSWORD is NOT set — emails will be skipped. " +
-        "Set it in microservices/auth-service/.env"
+      "[email] SMTP password is NOT set — emails will be skipped. " +
+        "Set SMTP_PASS (or EMAIL_APP_PASSWORD) in the environment."
     );
     return { ok: true, status: "NOT_CONFIGURED" };
   }
@@ -76,7 +92,7 @@ export async function verifyEmailTransport() {
     const transporter = await getTransporter();
     const info = await transporter.verify();
     console.log(
-      `[email] SMTP READY -> user=${senderAddress()} host=smtp.gmail.com:465 (SMTPS)`
+      `[email] SMTP READY -> user=${smtpUser()} host=${SMTP_HOST}:${SMTP_PORT} (${SMTP_SECURE ? "SMTPS" : "STARTTLS"})`
     );
     return { ok: true, status: "REACHABLE", info };
   } catch (err) {
@@ -93,16 +109,16 @@ export async function verifyEmailTransport() {
 
 export const sendEmail = async (to, subject, html) => {
   const from = `"${APP_NAME}" <${senderAddress()}>`;
-  const pass = senderPassword();
+  const pass = smtpPass();
 
   console.log("EMAIL SENDING STARTED ->", { to, subject, from });
 
   if (!pass) {
     console.warn(
-      "[email] EMAIL_APP_PASSWORD missing — refusing to send. " +
-        "Add EMAIL_APP_PASSWORD=<gmail-app-password> to auth-service/.env"
+      "[email] SMTP password missing — refusing to send. " +
+        "Set SMTP_PASS (or EMAIL_APP_PASSWORD) in the environment."
     );
-    const err = new Error("EMAIL_APP_PASSWORD is not configured");
+    const err = new Error("SMTP password is not configured");
     err.code = "EMAIL_NOT_CONFIGURED";
     throw err;
   }
