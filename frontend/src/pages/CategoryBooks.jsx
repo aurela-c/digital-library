@@ -123,11 +123,6 @@ export default function CategoryBooks() {
     [apiBooks, slug]
   );
 
-  const professorPicks = { literature: 3 };
-  const professorBook = filteredBooks.find(
-    (book) => book.id === professorPicks[slug]
-  );
-
   const handleSave = async (form, mode) => {
     const payload = {
       title: form.title.trim(),
@@ -205,42 +200,6 @@ export default function CategoryBooks() {
 
       <div className="bg-[#f5efe9] py-8 sm:py-10 relative z-10">
         <PageContainer>
-          {professorBook && (
-            <div className="relative flex flex-col md:flex-row gap-6 md:gap-8 p-5 sm:p-8 rounded-2xl overflow-hidden shadow-xl mb-8 sm:mb-12">
-              <div
-                className="absolute inset-0 bg-cover bg-center blur-md scale-110"
-                style={{ backgroundImage: `url(${professorBook.image})` }}
-              />
-              <div className="absolute inset-0 bg-black/40" />
-              <div className="relative flex flex-col sm:flex-row gap-4 sm:gap-6 md:gap-8 items-center text-center sm:text-left">
-                <Link
-                  to={`/book/${professorBook.id}`}
-                  className="shrink-0 w-36 sm:w-40 self-center sm:self-start"
-                >
-                  <img
-                    {...coverImgProps(professorBook.image)}
-                    alt=""
-                    className="w-full aspect-[2/3] object-cover rounded-lg shadow-lg hover:scale-105 transition"
-                  />
-                </Link>
-                <div className="text-white min-w-0 flex-1">
-                  <h2 className="text-xs uppercase tracking-widest text-gray-200 mb-2">
-                    Professor&apos;s Pick
-                  </h2>
-                  <h3 className="text-xl sm:text-2xl font-bold mb-2 line-clamp-2">
-                    {professorBook.title}
-                  </h3>
-                  <p className="text-gray-200 font-medium mb-2 text-sm sm:text-base">
-                    {professorBook.author}
-                  </p>
-                  <p className="text-gray-300 text-xs sm:text-sm line-clamp-4 sm:line-clamp-6">
-                    {professorBook.description}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
             <h2 className="text-lg sm:text-xl font-bold capitalize">
               All {meta?.label || slug} Books
