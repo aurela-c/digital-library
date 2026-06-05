@@ -41,9 +41,8 @@ async function buildTransport() {
 
   return nodemailer.createTransport({
     host: ipv4,
-    port: 587,
-    secure: false,
-    requireTLS: true,
+    port: 465,
+    secure: true,
     auth: { user, pass },
     connectionTimeout: 15000,
     greetingTimeout: 15000,
@@ -77,7 +76,7 @@ export async function verifyEmailTransport() {
     const transporter = await getTransporter();
     const info = await transporter.verify();
     console.log(
-      `[email] SMTP READY -> user=${senderAddress()} host=smtp.gmail.com:587 (STARTTLS)`
+      `[email] SMTP READY -> user=${senderAddress()} host=smtp.gmail.com:465 (SMTPS)`
     );
     return { ok: true, status: "REACHABLE", info };
   } catch (err) {
