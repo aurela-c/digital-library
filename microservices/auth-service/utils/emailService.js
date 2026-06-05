@@ -29,18 +29,24 @@ function buildTransport() {
   const user = senderAddress();
   const pass = senderPassword();
 
-  // Explicit Gmail SMTP config. Using port 465 + secure=true is the most
-  // reliable variant in dev (it sidesteps STARTTLS proxies & antivirus).
+  // Explicit Gmail SMTP config. Port 587 + STARTTLS is the most portable
+  // variant — every managed platform (Railway, Render, Fly, Heroku) allows
+  // outbound 587 while many block 465. `family: 4` forces IPv4 because
+  // smtp.gmail.com has AAAA records and most PaaS containers cannot reach
+  // IPv6 destinations (manifests as ENETUNREACH 2607:f8b0:...:465).
+  // Timeouts are tight so a transient SMTP outage fails fast instead of
+  // hanging the whole request for two minutes.
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 465,
-    secure: true, // SSL on connect
+    port: 587,
+    secure: false,        // upgrade to TLS after CONNECT via STARTTLS
+    requireTLS: true,     // refuse to send if STARTTLS handshake fails
     auth: { user, pass },
-    tls: {
-      // Helps when behind corporate proxies that re-sign certs.
-      // Safe for dev — Gmail's cert is always valid for the real Gmail host.
-      rejectUnauthorized: true,
-    },
+    family: 4,            // force IPv4 — avoids ENETUNREACH on PaaS
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+    tls: { rejectUnauthorized: true },
     logger: isDebug(),
     debug: isDebug(),
   });
@@ -66,7 +72,7 @@ export async function verifyEmailTransport() {
   try {
     const info = await getTransporter().verify();
     console.log(
-      `[email] SMTP READY -> user=${senderAddress()} host=smtp.gmail.com:465 (secure)`
+      `[email] SMTP READY -> user=${senderAddress()} host=smtp.gmail.com:587 (STARTTLS)`
     );
     return { ok: true, status: "REACHABLE", info };
   } catch (err) {

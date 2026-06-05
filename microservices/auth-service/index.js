@@ -57,6 +57,11 @@ app.get(
       },
       {
         key: "email",
+        // SMTP is non-critical for liveness: if Gmail is briefly unreachable
+        // (e.g. PaaS egress hiccup) we still want the container to stay up
+        // and keep serving login / refresh / profile traffic. The health
+        // payload still reports the real SMTP status as DEGRADED.
+        critical: false,
         run: async () => {
           try {
             return await verifyEmailTransport();
