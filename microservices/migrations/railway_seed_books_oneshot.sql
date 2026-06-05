@@ -1,0 +1,16 @@
+INSERT IGNORE INTO books (id, title, author, image, description, category_id, total_copies, available_copies, is_popular, created_at) VALUES
+(1, '1984', 'GEORGE ORWELL', '/images/book1.jpg', 'A dystopian world where surveillance controls every aspect of life and privacy no longer exists. Winston Smith begins to question the system he lives in.', 1, 5, 5, 1, NOW()),
+(2, 'Agua Viva', 'CLARICE LISPECTOR', '/images/book8.jpg', 'A poetic reflection on consciousness, existence, and the flow of thought. The narrative moves freely, without structure.', 1, 5, 5, 1, NOW()),
+(3, 'Giovanni''s Room', 'JAMES BALDWIN', '/images/book9.jpg', 'A story of identity, love, and inner conflict set in Paris. The protagonist struggles with desire and societal expectations.', 1, 5, 5, 1, NOW()),
+(4, 'Norwegian Wood', 'HARUKI MURAKAMI', '/images/book11.jpg', 'A nostalgic tale of love, loss, and emotional memory in 1960s Tokyo. The past constantly influences the present.', 1, 5, 5, 1, NOW()),
+(5, 'The Nickel Boys', 'COLSON WHITEHEAD', '/images/book5.jpg', 'A powerful story set in a reform school where injustice and abuse are hidden behind authority. Two boys try to survive.', 1, 5, 5, 0, NOW()),
+(6, 'Begin Again', 'JENNY LYNNE MORRISON', '/images/book6.jpg', 'A story about rebuilding life after emotional collapse and starting over.', 1, 5, 5, 0, NOW()),
+(7, 'The Odd Women', 'GEORGE GISSING', '/images/book20.jpg', 'Set in Victorian England, this novel explores the harsh realities faced by women who remain unmarried in a society defined by rigid gender roles.', 1, 5, 5, 0, NOW()),
+(8, 'The Trial', 'FRANZ KAFKA', '/images/book12.JPG', 'A man is suddenly arrested and prosecuted by an unknown authority without ever being told his crime.', 1, 5, 5, 1, NOW()),
+(9, 'The Great Gatsby', 'F. SCOTT FITZGERALD', '/images/book13.JPG', 'Set in the Roaring Twenties, this novel follows Jay Gatsby and his obsessive love for Daisy Buchanan.', 1, 5, 5, 0, NOW()),
+(10, 'Animal Farm', 'GEORGE ORWELL', '/images/book14.jpg', 'A group of farm animals overthrow their human owner in hopes of creating equality. The revolution slowly turns into dictatorship.', 1, 5, 5, 0, NOW()),
+(11, 'Fahrenheit 451', 'RAY BRADBURY', '/images/book15.jpg', 'In a future where books are banned, firemen burn any that are found. Society is controlled through censorship.', 1, 5, 5, 0, NOW()),
+(12, 'Before the Coffee Gets Cold', 'TOSHIKAZU KAWAGUCHI', '/images/book16.JPG', 'A cafe in Tokyo allows customers to travel back in time, but only under strict rules.', 1, 5, 5, 0, NOW()),
+(13, 'Vampire in Love', 'ENRIQUE VILA-MATAS', '/images/book17.jpg', 'A surreal story blending love, obsession, and fiction. Reality and imagination constantly overlap.', 1, 5, 5, 0, NOW()),
+(14, 'The Debut', 'ANITA BROOKNER', '/images/book18.jpg', 'A quiet story about a young woman navigating loneliness and independence.', 1, 5, 5, 0, NOW()),
+(15, 'Little Women', 'LOUISA MAY ALCOTT', '/images/book19.JPG', 'The story of the four March sisters growing up during the American Civil War.', 1, 5, 5, 1, NOW());

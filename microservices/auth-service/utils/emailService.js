@@ -1,13 +1,18 @@
 import nodemailer from "nodemailer";
-import { lookup as dnsLookup } from "dns";
+import { resolve4 } from "dns/promises";
 
-const ipv4OnlyLookup = (hostname, options, callback) => {
-  if (typeof options === "function") {
-    callback = options;
-    options = {};
-  }
-  return dnsLookup(hostname, { ...(options || {}), family: 4 }, callback);
-};
+const GMAIL_SMTP_HOST = "smtp.gmail.com";
+let _gmailIPv4Promise = null;
+function resolveGmailIPv4() {
+  if (_gmailIPv4Promise) return _gmailIPv4Promise;
+  _gmailIPv4Promise = resolve4(GMAIL_SMTP_HOST).then((addrs) => {
+    if (!addrs.length) {
+      throw new Error(`No IPv4 A record for ${GMAIL_SMTP_HOST}`);
+    }
+    return addrs[0];
+  });
+  return _gmailIPv4Promise;
+}
 
 const APP_NAME = process.env.APP_NAME || "Digital Library";
 const DEFAULT_SENDER = "aurelacocaj1@gmail.com";
@@ -29,30 +34,33 @@ function transporterKey() {
   return `${senderAddress()}::${senderPassword().slice(0, 4)}`;
 }
 
-function buildTransport() {
+async function buildTransport() {
   const user = senderAddress();
   const pass = senderPassword();
+  const ipv4 = await resolveGmailIPv4();
 
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
+    host: ipv4,
     port: 587,
-    secure: false,        
-    requireTLS: true,    
+    secure: false,
+    requireTLS: true,
     auth: { user, pass },
-    lookup: ipv4OnlyLookup,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 30000,
-    tls: { rejectUnauthorized: true },
+    tls: {
+      servername: GMAIL_SMTP_HOST,
+      rejectUnauthorized: true,
+    },
     logger: isDebug(),
     debug: isDebug(),
   });
 }
 
-function getTransporter() {
+async function getTransporter() {
   const key = transporterKey();
   if (_transporter && _transporterKey === key) return _transporter;
-  _transporter = buildTransport();
+  _transporter = await buildTransport();
   _transporterKey = key;
   return _transporter;
 }
@@ -66,7 +74,8 @@ export async function verifyEmailTransport() {
     return { ok: true, status: "NOT_CONFIGURED" };
   }
   try {
-    const info = await getTransporter().verify();
+    const transporter = await getTransporter();
+    const info = await transporter.verify();
     console.log(
       `[email] SMTP READY -> user=${senderAddress()} host=smtp.gmail.com:587 (STARTTLS)`
     );
@@ -100,7 +109,8 @@ export const sendEmail = async (to, subject, html) => {
   }
 
   try {
-    const info = await getTransporter().sendMail({ from, to, subject, html });
+    const transporter = await getTransporter();
+    const info = await transporter.sendMail({ from, to, subject, html });
     console.log("EMAIL SENT SUCCESS ->", {
       to,
       messageId: info.messageId,
