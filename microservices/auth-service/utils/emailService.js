@@ -1,10 +1,14 @@
 import nodemailer from "nodemailer";
 import { resolve4 } from "dns/promises";
 
-// SMTP config is env-driven so we can swap providers without redeploys.
-// Defaults to Gmail (for local dev). On Railway (which blocks outbound
-// SMTP to Gmail) set SMTP_HOST/PORT/USER/PASS to a relay that listens
-// on port 2525 (Brevo, SendGrid, Mailgun, ...).
+// Two delivery paths are supported:
+//   1) Brevo HTTP API   — set BREVO_API_KEY (recommended on PaaS like Railway
+//      where outbound SMTP ports are blocked; uses HTTPS / port 443).
+//   2) SMTP via nodemailer — set SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS
+//      (used for local dev and providers that allow SMTP egress).
+const BREVO_API_KEY = (process.env.BREVO_API_KEY || "").trim();
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+
 const SMTP_HOST = (process.env.SMTP_HOST || "smtp.gmail.com").trim();
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_SECURE =
@@ -80,11 +84,66 @@ async function getTransporter() {
   return _transporter;
 }
 
+async function sendViaBrevoApi({ from, to, subject, html }) {
+  const fromMatch = /^"?([^"<]*)"?\s*<?([^<>\s]+@[^<>\s]+)>?$/.exec(from);
+  const fromName = (fromMatch?.[1] || APP_NAME).trim() || APP_NAME;
+  const fromEmail = (fromMatch?.[2] || senderAddress()).trim();
+
+  const payload = {
+    sender: { name: fromName, email: fromEmail },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+  };
+
+  const res = await fetch(BREVO_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "api-key": BREVO_API_KEY,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const text = await res.text();
+  let body;
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = { raw: text };
+  }
+
+  if (!res.ok) {
+    const err = new Error(
+      `Brevo API error ${res.status}: ${body?.message || body?.raw || res.statusText}`
+    );
+    err.code = body?.code || `HTTP_${res.status}`;
+    err.responseCode = res.status;
+    err.response = body;
+    throw err;
+  }
+
+  return {
+    messageId: body?.messageId,
+    response: `Brevo API ${res.status}`,
+    accepted: [to],
+    rejected: [],
+    envelope: { from: fromEmail, to: [to] },
+  };
+}
+
 export async function verifyEmailTransport() {
+  if (BREVO_API_KEY) {
+    console.log(
+      `[email] EMAIL READY -> provider=brevo-http-api from=${senderAddress()}`
+    );
+    return { ok: true, status: "REACHABLE", provider: "brevo-http-api" };
+  }
   if (!smtpPass()) {
     console.warn(
-      "[email] SMTP password is NOT set — emails will be skipped. " +
-        "Set SMTP_PASS (or EMAIL_APP_PASSWORD) in the environment."
+      "[email] No email transport configured — emails will be skipped. " +
+        "Set BREVO_API_KEY (recommended on Railway) or SMTP_PASS."
     );
     return { ok: true, status: "NOT_CONFIGURED" };
   }
@@ -97,6 +156,10 @@ export async function verifyEmailTransport() {
     return { ok: true, status: "REACHABLE", info };
   } catch (err) {
     console.error("[email] SMTP VERIFY FAILED ->", {
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
+      user: smtpUser(),
       message: err.message,
       code: err.code,
       command: err.command,
@@ -109,16 +172,44 @@ export async function verifyEmailTransport() {
 
 export const sendEmail = async (to, subject, html) => {
   const from = `"${APP_NAME}" <${senderAddress()}>`;
+
+  console.log("EMAIL SENDING STARTED ->", {
+    to,
+    subject,
+    from,
+    provider: BREVO_API_KEY ? "brevo-http-api" : "smtp",
+  });
+
+  if (BREVO_API_KEY) {
+    try {
+      const info = await sendViaBrevoApi({ from, to, subject, html });
+      console.log("EMAIL SENT SUCCESS ->", {
+        to,
+        provider: "brevo-http-api",
+        messageId: info.messageId,
+        response: info.response,
+      });
+      return info;
+    } catch (err) {
+      console.error("EMAIL ERROR (brevo-http-api) ->", {
+        to,
+        subject,
+        message: err.message,
+        code: err.code,
+        responseCode: err.responseCode,
+        response: err.response,
+      });
+      throw err;
+    }
+  }
+
   const pass = smtpPass();
-
-  console.log("EMAIL SENDING STARTED ->", { to, subject, from });
-
   if (!pass) {
     console.warn(
-      "[email] SMTP password missing — refusing to send. " +
-        "Set SMTP_PASS (or EMAIL_APP_PASSWORD) in the environment."
+      "[email] No transport configured — refusing to send. " +
+        "Set BREVO_API_KEY or SMTP_PASS in the environment."
     );
-    const err = new Error("SMTP password is not configured");
+    const err = new Error("No email transport configured");
     err.code = "EMAIL_NOT_CONFIGURED";
     throw err;
   }
@@ -128,6 +219,7 @@ export const sendEmail = async (to, subject, html) => {
     const info = await transporter.sendMail({ from, to, subject, html });
     console.log("EMAIL SENT SUCCESS ->", {
       to,
+      provider: "smtp",
       messageId: info.messageId,
       response: info.response,
       accepted: info.accepted,
@@ -136,7 +228,7 @@ export const sendEmail = async (to, subject, html) => {
     });
     return info;
   } catch (err) {
-    console.error("EMAIL ERROR ->", {
+    console.error("EMAIL ERROR (smtp) ->", {
       to,
       subject,
       message: err.message,
