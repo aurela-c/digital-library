@@ -168,8 +168,13 @@ const start = async () => {
     // container network. Node defaults to dual-stack on Linux but this
     // makes the intent obvious and is required by the docker compose
     // health/scrape model.
-    app.listen(httpPort, "0.0.0.0", () => {
-      logger.info(`HTTP listening on 0.0.0.0:${httpPort}`);
+    // Bind to "::" (IPv6 dual-stack). On Linux this also accepts IPv4
+    // connections via IPv4-mapped IPv6 addresses, AND lets Railway's
+    // internal DNS (which resolves *.railway.internal to AAAA records
+    // only) reach this service. Binding to "0.0.0.0" alone would make
+    // every internal service-to-service HTTP call time out on Railway.
+    app.listen(httpPort, "::", () => {
+      logger.info(`HTTP listening on [::]:${httpPort}`);
       printExpressStack(app, "auth-service");
 
       setTimeout(() => {

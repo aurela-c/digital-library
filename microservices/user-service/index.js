@@ -192,9 +192,11 @@ const start = async () => {
     }
 
     const httpPort = Number(process.env.PORT) || 5002;
-    // Explicit 0.0.0.0 bind — see auth-service/index.js for rationale.
-    app.listen(httpPort, "0.0.0.0", () => {
-      logger.info(`HTTP listening on 0.0.0.0:${httpPort}`);
+    // Bind to "::" so Railway's IPv6-only internal DNS can reach us
+    // (see auth-service/index.js for the full explanation). The
+    // dual-stack listener also accepts IPv4 connections on Linux.
+    app.listen(httpPort, "::", () => {
+      logger.info(`HTTP listening on [::]:${httpPort}`);
 
       setTimeout(() => {
         registerService("user-service", httpPort);

@@ -269,7 +269,11 @@ printExpressStack(app, "api-gateway");
 // Explicit 0.0.0.0 bind so the gateway is reachable from sibling
 // containers (nginx frontend, prometheus, etc.) inside the docker
 // network. Node defaults to dual-stack on Linux but the explicit form
-// avoids surprises across docker host platforms.
-app.listen(port, "0.0.0.0", () => {
-  logger.info(`HTTP listening on 0.0.0.0:${port}`);
+// avoids surprises across docker host platforms. On Railway "::" is
+// required because the platform's internal DNS resolves *.railway.internal
+// to AAAA records only — a pure IPv4 bind would make the frontend's
+// nginx proxy time out with 502/504 when it tries to forward requests
+// to gateway.railway.internal.
+app.listen(port, "::", () => {
+  logger.info(`HTTP listening on [::]:${port}`);
 });

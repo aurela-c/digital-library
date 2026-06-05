@@ -238,11 +238,11 @@ const AdminDashboard = () => {
         <main className="flex-1 min-w-0 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
           <PageHeader section={section} />
 
-          {error && (
+        {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-              {error}
-            </div>
-          )}
+            {error}
+          </div>
+        )}
 
           {section === "overview" && (
             <OverviewSection
@@ -630,7 +630,7 @@ const UsersSection = ({
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-700">
             <tr>
@@ -640,9 +640,9 @@ const UsersSection = ({
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Verified</th>
               <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
             {loading && (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500">
@@ -664,7 +664,7 @@ const UsersSection = ({
                 const status = (u.accountStatus || "ACTIVE").toUpperCase();
                 const isSelf = String(u.id) === String(currentUserId);
                 return (
-                  <tr key={u.id} className="hover:bg-gray-50/80">
+                <tr key={u.id} className="hover:bg-gray-50/80">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-[#D34F4E]/10 text-[#D34F4E] flex items-center justify-center text-xs font-bold">
@@ -681,8 +681,8 @@ const UsersSection = ({
                           </p>
                           <p className="text-xs text-gray-500">ID #{u.id}</p>
                         </div>
-                      </div>
-                    </td>
+                    </div>
+                  </td>
                     <td className="px-4 py-3 text-gray-700 break-all">{u.email}</td>
                     <td className="px-4 py-3">
                       <select
@@ -698,7 +698,7 @@ const UsersSection = ({
                           </option>
                         ))}
                       </select>
-                    </td>
+                  </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${
@@ -1121,11 +1121,11 @@ const BooksSection = ({ books, loading, onReload }) => {
                       >
                         <FiTrash2 className="text-[11px]" /> Delete
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
           </div>
         </section>
       ))}
